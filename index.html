@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0F766E">
 <title>Aadhithran Enterprises — Garment ERP</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -96,7 +97,6 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 .hero .hero-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.78);display:flex;align-items:center;gap:5px}
 .hero .hero-label svg{width:12px;height:12px}
 .hero .hero-badge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:100px;background:rgba(255,255,255,.2);display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,.22)}
-.hero .hero-badge svg{animation:softGlow 2.4s ease-out infinite}
 .hero .hero-amount{font-size:34px;font-weight:800;letter-spacing:-.045em;line-height:1.05;font-variant-numeric:tabular-nums}
 .hero .hero-sub{margin-top:5px;font-size:12px;color:rgba(255,255,255,.88);font-weight:500}
 .hero .hero-row{display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18)}
@@ -451,17 +451,6 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 @keyframes sheetIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
 @keyframes fabPop{0%{transform:scale(0) rotate(-90deg)}70%{transform:scale(1.12) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
 
-@media print{
-  body{background:#fff;overflow:visible}
-  .app-header,.tabbar,.fab,.filter-bar,.custom-date-row,.active-filter-strip,.share-btn,#exportPdfBtn,.reports-top-pad,.month-nav{display:none !important}
-  .screens{padding:0;overflow:visible}
-  .screen:not(.active){display:none !important}
-  #reportContent{padding:0}
-  .grid-scroll{overflow:visible}
-  .grid-table th{background:#0F766E !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .grid-table td.has-val{background:#D1FAE5 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
 }
@@ -504,6 +493,7 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
   <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
   <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></symbol>
   <symbol id="i-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 1 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-3a2 2 0 1 1 4 0"/></symbol>
+  <symbol id="i-excel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/><path d="M14 2v6h6"/><path d="m9 13 6 6M15 13l-6 6"/></symbol>
 </svg>
 
 <div class="login" id="loginScreen">
@@ -614,8 +604,8 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
       <div id="monthNavWrap"></div>
       <div id="activeFilterStrip" class="active-filter-strip"></div>
       <div id="reportContent"></div>
-      <button class="share-btn" id="shareBtn"><svg><use href="#i-share"/></svg>Share Report</button>
-      <div style="padding:0 16px 8px"><button class="btn outline" id="exportPdfBtn"><svg><use href="#i-pdf"/></svg>Export as PDF (A4)</button></div>
+      <button class="share-btn" id="shareExcelBtn"><svg><use href="#i-excel"/></svg>Share as Excel</button>
+      <div style="padding:0 16px 8px"><button class="btn outline" id="downloadExcelBtn"><svg><use href="#i-download"/></svg>Download Excel (.xlsx)</button></div>
       <div style="height:20px"></div>
     </div>
   </div>
@@ -648,17 +638,19 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
-   AADHITHRAN ERP — v12 Final
+   AADHITHRAN ERP — v13
+   Single-file package: gzip+shard cloud sync + Excel export.
    ═══════════════════════════════════════════════════════════════════ */
 
 const LS = 'aadhithran_erp_v12';
-const META_LS = 'aadhithran_meta_v12';
+const META_LS = 'aadhithran_meta_v13';
 
 const JSONBIN_API_KEY = '$2a$10$B8zPn16pugEhGeSU1agI4uWaUQYBeCFMWryHYKZJ4/6LoDL0SziFy';
 const JSONBIN_BIN_ID  = '6aba0ef1ffd5d1605336a452';
 const JSONBIN_BASE    = 'https://api.jsonbin.io/v3/b';
 const SYNC_INTERVAL   = 30 * 1000;
 const PUSH_DEBOUNCE   = 3000;
+const SHARD_CHARS     = 85000;   // base64 chars per shard (~85 KB, under JSONBin free 100 KB cap)
 
 const LINES = ['L-01','L-02','L-03','L-04'];
 const SKILLS = ['Tailor','Checker','Helper','Ironman','Cutter','Packer','Supervisor'];
@@ -896,7 +888,7 @@ function seed () {
     companyStaff, staffHours: [], recurring: [],
     admin:   { pin:'1234', name:'Admin' },
     account: { pin:'1605', name:'Account' },
-    session: null, version: 12, _lastModified: Date.now(),
+    session: null, version: 13, _lastModified: Date.now(),
   };
 }
 
@@ -929,12 +921,15 @@ DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({
 DB.admin = DB.admin || { pin:'1234', name:'Admin' };
 DB.account = DB.account || { pin:'1605', name:'Account' };
 DB.session = DB.session || null;
-DB.version = 12;
+DB.version = 13;
 DB._lastModified = DB._lastModified || Date.now();
 
 let META;
 try { META = JSON.parse(localStorage.getItem(META_LS) || '{}'); } catch (e) { META = {}; }
 META.lastBackup = META.lastBackup || null;
+META.shardIds   = Array.isArray(META.shardIds) ? META.shardIds : [];
+META.cloudBytes = META.cloudBytes || 0;
+META.cloudGz    = META.cloudGz || 0;
 function persistMeta () { try { localStorage.setItem(META_LS, JSON.stringify(META)); } catch(e){} }
 
 function save () {
@@ -950,58 +945,180 @@ let currentSession = null;
 const isAdmin   = () => currentSession && currentSession.role === 'admin';
 const isAccount = () => currentSession && currentSession.role === 'account';
 
+/* ═══ Cloud payload compression + sharding ══════════════════════════
+   JSONBin free plan rejects any record > 100 KB. We gzip the whole DB
+   and, if needed, split the base64 across extra shard bins.
+   ══════════════════════════════════════════════════════════════════ */
+function fmtBytes (n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(2) + ' MB';
+}
+function bytesToBase64 (bytes) {
+  let bin = '';
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+function base64ToBytes (b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function gzipB64 (str) {
+  if (typeof CompressionStream === 'undefined') throw new Error('Browser cannot compress (needs iOS 16.4+ / modern Chrome).');
+  const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+  const buf = await new Response(stream).arrayBuffer();
+  return bytesToBase64(new Uint8Array(buf));
+}
+async function gunzipB64 (b64) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('Browser cannot decompress.');
+  const bytes = base64ToBytes(b64);
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(stream).text();
+}
+function normalizeRemote (remote, liveSession) {
+  return {
+    ...remote,
+    employees: Array.isArray(remote.employees) ? remote.employees : [],
+    bundles: (remote.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] })),
+    masterOps: Array.isArray(remote.masterOps) ? remote.masterOps : [],
+    expenses: Array.isArray(remote.expenses) ? remote.expenses : [],
+    advances: Array.isArray(remote.advances) ? remote.advances.map(a => ({ ...a, amount: Number(a.amount) || 0, settled: a.settled === true })) : [],
+    production: Array.isArray(remote.production) ? remote.production : [],
+    recents: remote.recents || [],
+    companyStaff: (remote.companyStaff || []).map(s => ({
+      ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
+    })),
+    staffHours: Array.isArray(remote.staffHours) ? remote.staffHours : [],
+    recurring: Array.isArray(remote.recurring) ? remote.recurring : [],
+    admin: remote.admin || { pin:'1234', name:'Admin' },
+    account: remote.account || { pin:'1605', name:'Account' },
+    session: liveSession || remote.session || null,
+    version: 13,
+  };
+}
+function localBytes () { try { return (localStorage.getItem(LS) || '').length; } catch (e) { return 0; } }
+
 const Sync = {
   status: 'idle', lastPull: null, lastPush: null, lastError: null, remoteTs: 0,
+  cloudRaw: 0, cloudGz: 0,
   _inFlight: false, _pushTimer: null, _pollTimer: null,
-  _bootstrapped: false, _pendingPush: false,
+  _bootstrapped: false, _pendingPush: false, _legacyRemote: false,
+
   headers () { return { 'Content-Type':'application/json', 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta':'false' }; },
   setStatus (s) { this.status = s; updateSyncIndicator(); },
+
+  shardIds () { return Array.isArray(META.shardIds) ? META.shardIds : []; },
+  setShardIds (ids) { META.shardIds = Array.isArray(ids) ? ids : []; persistMeta(); },
+
+  async _get (binId) {
+    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}/latest`, {
+      method: 'GET',
+      headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
+      cache: 'no-store',
+    });
+    if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error(`HTTP ${r.status}${t ? ' — ' + t.slice(0,120) : ''}`); }
+    return await r.json();
+  },
+  async _put (binId, obj) {
+    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}`, {
+      method: 'PUT', headers: this.headers(), body: JSON.stringify(obj),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      if (r.status === 403 && /100\s*kb/i.test(t)) throw new Error('Record exceeds JSONBin 100 KB free limit');
+      throw new Error(`HTTP ${r.status}${t ? ' — ' + t.slice(0,120) : ''}`);
+    }
+    return r.json().catch(() => ({}));
+  },
+  async _create (obj, name) {
+    const r = await fetch(JSONBIN_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Name': name, 'X-Bin-Private': 'true' },
+      body: JSON.stringify(obj),
+    });
+    if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error(`HTTP ${r.status}${t ? ' — ' + t.slice(0,120) : ''}`); }
+    const j = await r.json();
+    const id = (j && j.metadata && j.metadata.id) || (j && j.id);
+    if (!id) throw new Error('Bin created but no id returned');
+    return id;
+  },
+  async _delete (binId) {
+    try { await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}`, { method:'DELETE', headers: { 'X-Master-Key': JSONBIN_API_KEY } }); } catch (e) {}
+  },
+
+  async _writeCompressed (rawJson, ts) {
+    const b64 = await gzipB64(rawJson);
+    this.cloudRaw = rawJson.length;
+    this.cloudGz  = b64.length;
+    META.cloudBytes = rawJson.length;
+    META.cloudGz    = b64.length;
+    persistMeta();
+
+    if (b64.length <= SHARD_CHARS) {
+      await this._put(JSONBIN_BIN_ID, { _v: 13, _gz: 1, _ts: ts, d: b64 });
+      const old = this.shardIds();
+      if (old.length) { old.forEach(id => this._delete(id)); this.setShardIds([]); }
+      return { shards: 0, bytes: b64.length };
+    }
+
+    const parts = [];
+    for (let i = 0; i < b64.length; i += SHARD_CHARS) parts.push(b64.slice(i, i + SHARD_CHARS));
+
+    let ids = this.shardIds().slice();
+    while (ids.length < parts.length) {
+      const id = await this._create({ _v:13, _shard: ids.length, d:'' }, 'aadhithran-shard-' + (ids.length + 1));
+      ids.push(id);
+    }
+    for (let i = 0; i < parts.length; i++) await this._put(ids[i], { _v:13, _shard:i, d: parts[i] });
+    const used = ids.slice(0, parts.length);
+    await this._put(JSONBIN_BIN_ID, { _v:13, _gz:1, _ts: ts, _parts: parts.length, _bins: used });
+    if (ids.length > parts.length) ids.slice(parts.length).forEach(id => this._delete(id));
+    this.setShardIds(used);
+    return { shards: parts.length, bytes: b64.length };
+  },
+
+  async _readRemote () {
+    const rec = await this._get(JSONBIN_BIN_ID);
+    if (!rec) return null;
+
+    if (rec._gz) {
+      let b64 = rec.d || '';
+      let shards = [];
+      if (rec._parts > 1 && Array.isArray(rec._bins)) {
+        shards = rec._bins.slice(0, rec._parts);
+        const chunks = await Promise.all(shards.map(id => this._get(id)));
+        b64 = chunks.map(c => (c && c.d) || '').join('');
+      }
+      this.setShardIds(shards);
+      return JSON.parse(await gunzipB64(b64));
+    }
+
+    this._legacyRemote = true;
+    return rec.record ? rec.record : rec;
+  },
+
   async pull (silent = false, forceReplace = false) {
     if (this._inFlight) return 'busy';
     this._inFlight = true;
     this.setStatus('pulling');
     try {
-      const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(JSONBIN_BIN_ID)}/latest`, {
-        method: 'GET',
-        headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
-        cache: 'no-store',
-      });
-      if (!r.ok) {
-        const body = await r.text().catch(() => '');
-        throw new Error(`HTTP ${r.status}${body ? ' — ' + body.slice(0, 140) : ''}`);
-      }
-      const j = await r.json();
-      const remote = j && j.record ? j.record : j;
+      const remote = await this._readRemote();
       if (!remote || !Array.isArray(remote.employees) || remote.employees.length === 0) {
-        this.lastPull = Date.now(); this.lastError = null;
-        this.setStatus('synced');
+        this.lastPull = Date.now(); this.lastError = null; this.setStatus('synced');
         if (!silent) toast('Cloud is empty');
         return 'empty';
       }
       const remoteTs = remote._lastModified || 0;
       const localTs  = DB._lastModified  || 0;
       this.remoteTs = remoteTs;
+
       if (forceReplace || remoteTs > localTs) {
         const liveSession = DB.session;
-        DB = {
-          ...remote,
-          employees: Array.isArray(remote.employees) ? remote.employees : [],
-          bundles: (remote.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] })),
-          masterOps: Array.isArray(remote.masterOps) ? remote.masterOps : [],
-          expenses: Array.isArray(remote.expenses) ? remote.expenses : [],
-          advances: Array.isArray(remote.advances) ? remote.advances.map(a => ({ ...a, amount: Number(a.amount)||0, settled: a.settled === true })) : [],
-          production: Array.isArray(remote.production) ? remote.production : [],
-          recents: remote.recents || [],
-          companyStaff: (remote.companyStaff || []).map(s => ({
-            ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
-          })),
-          staffHours: Array.isArray(remote.staffHours) ? remote.staffHours : [],
-          recurring: Array.isArray(remote.recurring) ? remote.recurring : [],
-          admin: remote.admin || { pin:'1234', name:'Admin' },
-          account: remote.account || { pin:'1605', name:'Account' },
-          session: liveSession || remote.session || null,
-          version: 12,
-        };
+        DB = normalizeRemote(remote, liveSession);
         localStorage.setItem(LS, JSON.stringify(DB));
         if (!silent) toast('Synced from cloud');
         processRecurring();
@@ -1014,15 +1131,17 @@ const Sync = {
     } catch (e) {
       this.lastError = e.message;
       this.setStatus('error');
-      if (!silent) toast('Pull failed: ' + e.message, { success: false });
+      if (!silent) toast('Pull failed: ' + e.message, { success:false });
       return 'failed';
     } finally { this._inFlight = false; }
   },
+
   queuePush () {
     if (!this._bootstrapped) { this._pendingPush = true; return; }
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this.push(false), PUSH_DEBOUNCE);
   },
+
   async push (force = false) {
     if (this._inFlight) { this.queuePush(); return 'busy'; }
     this._pushTimer = null;
@@ -1030,40 +1149,43 @@ const Sync = {
     this.setStatus('pushing');
     const nextTs = Date.now();
     try {
-      const payload = JSON.stringify({ ...DB, _lastModified: nextTs });
-      const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(JSONBIN_BIN_ID)}`, {
-        method: 'PUT', headers: this.headers(), body: payload,
-      });
-      if (!r.ok) {
-        const body = await r.text().catch(() => '');
-        throw new Error(`HTTP ${r.status}${body ? ' — ' + body.slice(0, 140) : ''}`);
-      }
+      const raw = JSON.stringify({ ...DB, _lastModified: nextTs });
+      const res = await this._writeCompressed(raw, nextTs);
+
       DB._lastModified = nextTs;
-      localStorage.setItem(LS, JSON.stringify(DB));
+      try { localStorage.setItem(LS, JSON.stringify(DB)); } catch (e) {}
       this.remoteTs = nextTs;
       this.lastPush = Date.now(); this.lastError = null;
       this.setStatus('synced');
-      if (force) toast('Pushed to cloud');
+      if (force) toast('Pushed · ' + fmtBytes(this.cloudRaw) + ' → ' + fmtBytes(res.bytes) + (res.shards ? ' (' + res.shards + ' shards)' : ''));
       return 'ok';
     } catch (e) {
       this.lastError = e.message;
       this.setStatus('error');
-      if (force) toast('Push failed: ' + e.message, { success: false });
+      if (force) toast('Push failed: ' + e.message, { success:false });
       return 'failed';
     } finally { this._inFlight = false; }
   },
+
   startPolling () { this.stopPolling(); this._pollTimer = setInterval(() => this.pull(true), SYNC_INTERVAL); },
   stopPolling () { if (this._pollTimer) clearInterval(this._pollTimer); this._pollTimer = null; },
+
   async bootstrap () {
     const result = await this.pull(true, isFreshSeed);
+
     if (result === 'failed') {
       this._bootstrapped = true;
       if (this._pendingPush) { this._pendingPush = false; this.queuePush(); }
-      this.startPolling(); return;
+      this.startPolling();
+      return;
     }
-    if (result === 'empty') await this.push(false);
-    else if (result === 'ok') {
-      if (!isFreshSeed && (DB._lastModified || 0) > (this.remoteTs || 0)) await this.push(false);
+    if (result === 'empty') {
+      await this.push(false);
+    } else if (result === 'ok') {
+      if (this._legacyRemote || (!isFreshSeed && (DB._lastModified || 0) > (this.remoteTs || 0))) {
+        this._legacyRemote = false;
+        await this.push(false);
+      }
     }
     isFreshSeed = false;
     this._bootstrapped = true;
@@ -1089,116 +1211,409 @@ function updateSyncIndicator () {
   el.title = map[s] || '';
 }
 
-async function backupNow () {
+/* ═══ Excel export ══════════════════════════════════════════════════
+   Uses SheetJS (loaded in <head>). Falls back to CSV if XLSX is
+   unavailable (e.g. first run offline with cold cache).
+   ══════════════════════════════════════════════════════════════════ */
+function safeSheetName (n) { return String(n).replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 31); }
+
+async function deliverWorkbook (wb, filename) {
+  if (typeof XLSX === 'undefined') throw new Error('Excel library not loaded — check your connection once, then retry.');
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+  // Try native share first (works in iOS Safari + Chrome Android)
   try {
-    const payload = { _app:'aadhithran-erp', _version:12, _exported:new Date().toISOString(), data: DB };
-    const json = JSON.stringify(payload, null, 2);
-    const stamp = new Date().toISOString().slice(0,10);
-    const filename = 'aadhithran-backup-' + stamp + '.json';
-    const blob = new Blob([json], { type:'application/json' });
-    const file = new File([blob], filename, { type:'application/json' });
+    const file = new File([blob], filename, { type: blob.type });
     if (navigator.canShare && navigator.canShare({ files:[file] })) {
-      try {
-        await navigator.share({ files:[file], title:'Aadhithran backup', text:'Backup ' + stamp });
-        META.lastBackup = Date.now(); persistMeta(); showSuccess(); toast('Backup shared'); return;
-      } catch (err) { if (err && err.name === 'AbortError') return; }
+      await navigator.share({ files:[file], title: filename, text:'Aadhithran Enterprises export' });
+      META.lastBackup = Date.now(); persistMeta();
+      showSuccess(); toast('Shared: ' + filename);
+      return true;
     }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return false;   // user cancelled – silently stop
+  }
+
+  // Fallback: download
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
+  META.lastBackup = Date.now(); persistMeta();
+  showSuccess(); toast('Saved: ' + filename);
+  return true;
+}
+
+function workbookFromSheets (sheets, meta) {
+  const wb = XLSX.utils.book_new();
+
+  // Optional "About" sheet
+  if (meta) {
+    const about = [
+      ['Aadhithran Enterprises — Export'],
+      ['Generated', new Date().toLocaleString('en-IN')],
+      ['Range', meta.range || '—'],
+      ['Role', (currentSession && currentSession.role) || '—'],
+      ['App version', DB.version],
+      ['Rows', meta.rows || '—'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(about);
+    ws['!cols'] = [{ wch: 22 }, { wch: 42 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'About');
+  }
+
+  for (const [name, rows] of Object.entries(sheets)) {
+    if (!rows.length) continue;
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // Auto width
+    const widths = (rows[0] || []).map((_, i) => {
+      let w = 10;
+      rows.forEach(r => { const v = String(r[i] == null ? '' : r[i]); if (v.length > w) w = Math.min(v.length, 42); });
+      return { wch: w + 2 };
+    });
+    ws['!cols'] = widths;
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(name));
+  }
+  return wb;
+}
+
+/* Build sheets for the currently-open report. */
+function buildCurrentReportSheets () {
+  const id = currentReport;
+  const out = {};
+  const { from, to } = resolveDateRange();
+  const rangeLabel = from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to);
+
+  const rows = applyFilters(DB.production);
+  const exps = applyExpenseFilters(DB.expenses);
+
+  if (id === 'monthly') {
+    const month = monthlyState.month || todayISO().slice(0,7);
+    const [y, m] = month.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const days = Array.from({ length: daysInMonth }, (_, i) => isoLocal(new Date(y, m-1, i+1)));
+    const header = ['Name', 'Type', ...days.map((_, i) => 'Day ' + (i+1)), 'Total'];
+    const body = [];
+    DB.employees.forEach(emp => {
+      const byDate = {};
+      DB.production.forEach(p => {
+        if (p.empId !== emp.id || p.date.slice(0,7) !== month) return;
+        byDate[p.date] = (byDate[p.date] || 0) + (Number(p.amount) || 0);
+      });
+      const vals = days.map(d => Math.round(byDate[d] || 0));
+      const total = vals.reduce((a,b) => a + b, 0);
+      if (total === 0) return;
+      body.push([emp.name, 'Operator', ...vals, total]);
+    });
+    DB.companyStaff.forEach(s => {
+      const byDate = {};
+      DB.staffHours.forEach(h => {
+        if (h.staffId !== s.id || h.date.slice(0,7) !== month) return;
+        byDate[h.date] = (byDate[h.date] || 0) + (Number(h.amount) || 0);
+      });
+      const vals = days.map(d => Math.round(byDate[d] || 0));
+      const total = vals.reduce((a,b) => a + b, 0);
+      if (total === 0) return;
+      body.push([s.name, 'Company Staff', ...vals, total]);
+    });
+    out['Monthly Grid'] = [header, ...body];
+    return { sheets: out, meta: { range: month, rows: body.length } };
+  }
+
+  if (id === 'weekly') {
+    const anchor = new Date((monthlyState.week || todayISO()) + 'T00:00:00');
+    const dow = anchor.getDay();
+    const monOff = dow === 0 ? -6 : 1 - dow;
+    const mon = new Date(anchor); mon.setDate(anchor.getDate() + monOff);
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mon); d.setDate(mon.getDate() + i); return isoLocal(d);
+    });
+    const header = ['Name', 'Type', ...weekDays, 'Total'];
+    const body = [];
+    DB.employees.forEach(emp => {
+      const byDate = {};
+      DB.production.forEach(p => {
+        if (p.empId !== emp.id || p.date < weekDays[0] || p.date > weekDays[6]) return;
+        byDate[p.date] = (byDate[p.date] || 0) + (Number(p.amount) || 0);
+      });
+      const vals = weekDays.map(d => Math.round(byDate[d] || 0));
+      const total = vals.reduce((a,b) => a + b, 0);
+      if (total === 0) return;
+      body.push([emp.name, 'Operator', ...vals, total]);
+    });
+    DB.companyStaff.forEach(s => {
+      const byDate = {};
+      DB.staffHours.forEach(h => {
+        if (h.staffId !== s.id || h.date < weekDays[0] || h.date > weekDays[6]) return;
+        byDate[h.date] = (byDate[h.date] || 0) + (Number(h.amount) || 0);
+      });
+      const vals = weekDays.map(d => Math.round(byDate[d] || 0));
+      const total = vals.reduce((a,b) => a + b, 0);
+      if (total === 0) return;
+      body.push([s.name, 'Company Staff', ...vals, total]);
+    });
+    out['Weekly Grid'] = [header, ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'salary') {
+    const byEmp = {};
+    rows.forEach(r => {
+      if (!byEmp[r.empId]) byEmp[r.empId] = { name:r.operatorName || '—', id:r.empId, line:r.line || '', pieces:0, rejects:0, wages:0 };
+      byEmp[r.empId].pieces += r.qty;
+      byEmp[r.empId].rejects += r.reject || 0;
+      byEmp[r.empId].wages += Number(r.amount) || 0;
+    });
+    const header = ['Employee ID', 'Name', 'Line', 'Pieces', 'Rejects', 'Wages', 'Advance (period)', 'Outstanding Advance', 'Net Payable'];
+    const body = Object.values(byEmp).sort((a,b) => b.wages - a.wages).map(e => {
+      const advIn = advanceTotalInPeriod('operator', e.id, from, to);
+      const advOut = advanceOutstanding('operator', e.id);
+      return [e.id, e.name, e.line, e.pieces, e.rejects, Math.round(e.wages), Math.round(advIn), Math.round(advOut), Math.round(e.wages - advIn)];
+    });
+    out['Salary'] = [header, ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'staffhours') {
+    const hours = DB.staffHours.filter(h => h.date >= from && h.date <= to);
+    const header = ['Date', 'Staff ID', 'Staff Name', 'Hours', 'Hourly Rate', 'Amount', 'Note'];
+    const body = hours.sort((a,b) => a.date.localeCompare(b.date)).map(h => [
+      h.date, h.staffId, h.staffName, h.hours, Number(h.hourlyRate.toFixed(2)), Math.round(h.amount), h.note || ''
+    ]);
+    out['Staff Hours'] = [header, ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'expense') {
+    const byCat = {};
+    exps.forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + Number(e.amount || 0); });
+    const catRows = [['Category', 'Amount'], ...Object.entries(byCat).sort((a,b) => b[1] - a[1]).map(([c,a]) => [c, Math.round(a)])];
+    const txRows  = [['Date', 'Category', 'Amount', 'Note', 'Auto'],
+      ...[...exps].sort((a,b) => a.date.localeCompare(b.date)).map(e => [e.date, e.category, Math.round(e.amount), e.note || '', e.auto ? 'Yes' : ''])];
+    out['By Category'] = catRows;
+    out['Transactions'] = txRows;
+    return { sheets: out, meta: { range: rangeLabel, rows: txRows.length - 1 } };
+  }
+
+  if (id === 'daily') {
+    const byDay = {};
+    rows.forEach(r => {
+      if (!byDay[r.date]) byDay[r.date] = { pcs:0, rej:0, wages:0, entries:0 };
+      byDay[r.date].pcs += r.qty; byDay[r.date].rej += r.reject||0; byDay[r.date].wages += Number(r.amount)||0; byDay[r.date].entries++;
+    });
+    const body = Object.keys(byDay).sort().map(d => [d, byDay[d].pcs, byDay[d].rej, Math.round(byDay[d].wages), byDay[d].entries]);
+    out['Daily'] = [['Date', 'Pieces', 'Rejects', 'Wages', 'Entries'], ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'operator') {
+    const byEmp = {};
+    rows.forEach(r => {
+      if (!byEmp[r.empId]) byEmp[r.empId] = { name:r.operatorName || '—', line:r.line || '', pieces:0, rejects:0, wages:0 };
+      byEmp[r.empId].pieces += r.qty; byEmp[r.empId].rejects += r.reject||0; byEmp[r.empId].wages += Number(r.amount)||0;
+    });
+    const body = Object.entries(byEmp).sort((a,b) => b[1].pieces - a[1].pieces)
+      .map(([id, e]) => [id, e.name, e.line, e.pieces, e.rejects, Math.round(e.wages)]);
+    out['Operators'] = [['Employee ID', 'Name', 'Line', 'Pieces', 'Rejects', 'Wages'], ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'bundle') {
+    const acc = isAccount();
+    const header = acc
+      ? ['Bundle', 'Style', 'Selling Price', 'Pieces', 'Rejects', 'Wages', 'Revenue', 'Margin']
+      : ['Bundle', 'Style', 'Cost/pc', 'Pieces', 'Rejects', 'Wages'];
+    const body = DB.bundles.filter(b => rows.some(r => r.bundleId === b.id)).map(b => {
+      const bRows = rows.filter(r => r.bundleId === b.id);
+      const pcs = bRows.reduce((a,r) => a + r.qty, 0);
+      const rej = bRows.reduce((a,r) => a + (r.reject||0), 0);
+      const wag = bRows.reduce((a,r) => a + (Number(r.amount)||0), 0);
+      if (acc) {
+        const rev = bRows.reduce((a,r) => a + entryRevenue(r), 0);
+        return [b.name, b.style || '', Number(b.sellingPrice || 0), pcs, rej, Math.round(wag), Math.round(rev), Math.round(rev - wag)];
+      }
+      return [b.name, b.style || '', bundleCostPerPiece(b), pcs, rej, Math.round(wag)];
+    });
+    out['Bundles'] = [header, ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'operation') {
+    const byOp = {};
+    rows.forEach(r => {
+      if (!byOp[r.operation]) byOp[r.operation] = { pcs:0, rej:0, wages:0, ops:new Set() };
+      byOp[r.operation].pcs += r.qty; byOp[r.operation].rej += r.reject||0; byOp[r.operation].wages += Number(r.amount)||0;
+      byOp[r.operation].ops.add(r.empId);
+    });
+    const body = Object.entries(byOp).sort((a,b) => b[1].pcs - a[1].pcs)
+      .map(([op, d]) => [op, d.pcs, d.rej, d.ops.size, Math.round(d.wages)]);
+    out['Operations'] = [['Operation', 'Pieces', 'Rejects', 'Operators', 'Wages'], ...body];
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'pnl') {
+    const s = getFilteredStats();
+    const summary = [
+      ['Metric', 'Amount'],
+      ['Revenue', Math.round(s.revenue)],
+      ['Operator Wages', Math.round(s.cost)],
+      ['Expenses', Math.round(s.expenseTotal)],
+      ['Net Profit', Math.round(s.net)],
+      ['Margin %', Number(s.margin.toFixed(2))],
+      ['Pieces Produced', s.pieces],
+    ];
+    const byDay = {};
+    s.rows.forEach(r => {
+      byDay[r.date] = byDay[r.date] || { rev:0, wage:0, exp:0 };
+      byDay[r.date].rev  += entryRevenue(r);
+      byDay[r.date].wage += entryCost(r);
+    });
+    s.expenses.forEach(e => {
+      byDay[e.date] = byDay[e.date] || { rev:0, wage:0, exp:0 };
+      byDay[e.date].exp += Number(e.amount || 0);
+    });
+    const daily = [['Date', 'Revenue', 'Wages', 'Expenses', 'Net'],
+      ...Object.keys(byDay).sort().map(d => {
+        const r = byDay[d];
+        return [d, Math.round(r.rev), Math.round(r.wage), Math.round(r.exp), Math.round(r.rev - r.wage - r.exp)];
+      })];
+    out['Summary'] = summary;
+    out['Daily'] = daily;
+    return { sheets: out, meta: { range: rangeLabel, rows: daily.length - 1 } };
+  }
+
+  if (id === 'advance') {
+    const header = ['Date', 'Type', 'Person ID', 'Person Name', 'Amount', 'Note', 'Status'];
+    const body = DB.advances
+      .filter(a => a.date >= from && a.date <= to)
+      .sort((a,b) => a.date.localeCompare(b.date))
+      .map(a => [a.date, a.personType, a.personId, a.personName, Math.round(a.amount), a.note || '', a.settled ? 'Settled' : 'Outstanding']);
+    const outstanding = [['Person Type', 'Person ID', 'Person Name', 'Outstanding'],
+      ...Object.values(DB.advances.filter(a => !a.settled).reduce((acc, a) => {
+        const k = a.personType + ':' + a.personId;
+        if (!acc[k]) acc[k] = { t:a.personType, id:a.personId, name:a.personName, amt:0 };
+        acc[k].amt += a.amount; return acc;
+      }, {})).map(p => [p.t, p.id, p.name, Math.round(p.amt)])];
+    out['Advances (period)'] = [header, ...body];
+    out['Outstanding (all-time)'] = outstanding;
+    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+  }
+
+  if (id === 'recurring') {
+    const header = ['Category', 'Amount', 'Frequency', 'Start', 'End', 'Status', 'Next Run', 'Note'];
+    const body = DB.recurring.map(r => [
+      r.category, Number(r.amount), r.frequency, r.startDate, r.endDate || '',
+      r.active ? 'Active' : 'Paused', nextRunHint(r), r.note || ''
+    ]);
+    out['Recurring'] = [header, ...body];
+    return { sheets: out, meta: { range: 'All time', rows: body.length } };
+  }
+
+  // generic fallback: dump the filtered production rows
+  const header = ['Date', 'Operator', 'Emp ID', 'Line', 'Bundle', 'Operation', 'Rate', 'Qty', 'Reject', 'Reason', 'Amount', 'Notes'];
+  const body = rows.map(r => [r.date, r.operatorName || '', r.empId || '', r.line || '', r.bundleName || '', r.operation || '',
+    Number(r.rate) || 0, r.qty, r.reject || 0, r.rejectReason || '', Math.round(r.amount || 0), r.notes || '']);
+  out['Data'] = [header, ...body];
+  return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
+}
+
+async function shareReportExcel () {
+  try {
+    const { sheets, meta } = buildCurrentReportSheets();
+    const wb = workbookFromSheets(sheets, meta);
+    const stamp = todayISO();
+    const safeTitle = (currentReport || 'report').replace(/[^a-z0-9]+/gi, '-');
+    await deliverWorkbook(wb, `aadhithran-${safeTitle}-${stamp}.xlsx`);
+  } catch (e) {
+    toast('Excel export failed: ' + e.message, { success:false });
+  }
+}
+async function downloadReportExcel () {
+  try {
+    const { sheets, meta } = buildCurrentReportSheets();
+    const wb = workbookFromSheets(sheets, meta);
+    const stamp = todayISO();
+    const safeTitle = (currentReport || 'report').replace(/[^a-z0-9]+/gi, '-');
+    const filename = `aadhithran-${safeTitle}-${stamp}.xlsx`;
+    const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+    const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename;
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
     META.lastBackup = Date.now(); persistMeta();
-    showSuccess(); toast('Backup saved');
-  } catch (e) { toast('Backup failed: ' + e.message, { success:false }); }
-}
-function pickRestoreFile () {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'application/json,.json';
-  input.onchange = async (e) => {
-    const file = e.target.files && e.target.files[0]; if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      const remote = parsed && parsed._app === 'aadhithran-erp' ? parsed.data : parsed;
-      if (!remote || !Array.isArray(remote.employees)) throw new Error('Not a valid backup');
-      if (!confirm('Restore this backup? This will replace local data and push to cloud.')) return;
-      const liveSession = DB.session;
-      DB = { ...remote, session: liveSession || null, _lastModified: Date.now() };
-      save(); showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
-    } catch (err) { toast('Restore failed: ' + err.message, { success:false }); }
-  };
-  input.click();
-}
-function confirmClearAll () {
-  if (!confirm('Delete ALL data on this device AND cloud bin?')) return;
-  if (prompt('Type DELETE to confirm:') !== 'DELETE') { toast('Cancelled'); return; }
-  const liveSession = DB.session;
-  DB = seed(); DB.session = liveSession; DB._lastModified = Date.now();
-  save(); setTimeout(() => Sync.push(true), 500);
-  showSuccess(); toast('Cleared'); closeSheet(); refreshCurrentScreen();
+    showSuccess(); toast('Saved: ' + filename);
+  } catch (e) {
+    toast('Excel export failed: ' + e.message, { success:false });
+  }
 }
 
-function bundleCostPerPiece (b) { return (b.ops || []).reduce((a,o) => a + (Number(o.rate) || 0), 0); }
-function entryCost (p) { return Number(p.amount) || 0; }
-function entryRevenue (p) {
-  const b = DB.bundles.find(x => x.id === p.bundleId);
-  if (!b || !b.sellingPrice) return 0;
-  const tc = bundleCostPerPiece(b);
-  if (!tc) return 0;
-  return (Number(p.qty) || 0) * b.sellingPrice * ((Number(p.rate) || 0) / tc);
+/* Full-database Excel workbook for Settings / backup */
+function buildFullWorkbook () {
+  const sheets = {};
+
+  sheets['Employees'] = [['ID', 'Name', 'Line', 'Skill', 'Status', 'Joined'],
+    ...DB.employees.map(e => [e.id, e.name, e.line, e.skill, e.status, e.joined || ''])];
+
+  sheets['Company Staff'] = [['ID', 'Name', 'Role', 'Salary', 'Hours/Day', 'Days/Month', 'Hourly Rate'],
+    ...DB.companyStaff.map(s => [s.id, s.name, s.role || '', s.salary, s.hoursPerDay, s.daysPerMonth, Number(staffHourlyRate(s).toFixed(2))])];
+
+  sheets['Master Operations'] = [['ID', 'Name', 'Description', 'Rate'],
+    ...DB.masterOps.map(o => [o.id, o.name, o.desc || '', Number(o.rate) || 0])];
+
+  sheets['Bundles'] = [['ID', 'Name', 'Style', 'Selling Price', 'Cost/pc', 'Operations'],
+    ...DB.bundles.map(b => [b.id, b.name, b.style || '', Number(b.sellingPrice) || 0, bundleCostPerPiece(b),
+      b.ops.map(o => `${o.name} (₹${o.rate})`).join(' + ')])];
+
+  sheets['Production'] = [['Date', 'Operator', 'Emp ID', 'Line', 'Bundle', 'Operation', 'Rate', 'Qty', 'Reject', 'Reason', 'Amount', 'Notes', 'TS'],
+    ...DB.production.map(r => [r.date, r.operatorName || '', r.empId || '', r.line || '', r.bundleName || '', r.operation || '',
+      Number(r.rate) || 0, r.qty, r.reject || 0, r.rejectReason || '', Math.round(r.amount || 0), r.notes || '', r.ts || ''])];
+
+  sheets['Expenses'] = [['Date', 'Category', 'Amount', 'Note', 'Auto', 'TS'],
+    ...DB.expenses.map(e => [e.date, e.category, Math.round(e.amount || 0), e.note || '', e.auto ? 'Yes' : '', e.ts || ''])];
+
+  sheets['Advances'] = [['Date', 'Type', 'Person ID', 'Person Name', 'Amount', 'Note', 'Settled', 'TS'],
+    ...DB.advances.map(a => [a.date, a.personType, a.personId, a.personName, Math.round(a.amount), a.note || '', a.settled ? 'Yes' : 'No', a.ts || ''])];
+
+  sheets['Staff Hours'] = [['Date', 'Staff ID', 'Staff Name', 'Hours', 'Hourly Rate', 'Amount', 'Note'],
+    ...DB.staffHours.map(h => [h.date, h.staffId, h.staffName, h.hours, Number((h.hourlyRate || 0).toFixed(2)), Math.round(h.amount || 0), h.note || ''])];
+
+  sheets['Recurring'] = [['Category', 'Amount', 'Frequency', 'Start', 'End', 'Active', 'Note'],
+    ...DB.recurring.map(r => [r.category, Number(r.amount), r.frequency, r.startDate, r.endDate || '', r.active ? 'Yes' : 'No', r.note || ''])];
+
+  return workbookFromSheets(sheets, {
+    range: 'All time · full database',
+    rows: DB.production.length + DB.expenses.length + DB.advances.length + DB.staffHours.length,
+  });
 }
 
-const filterState = {
-  dateType: 'preset', preset: 'today', from: '', to: '',
-  operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all',
-};
-function resolveDateRange () {
-  const today = new Date(); today.setHours(0,0,0,0);
-  if (filterState.dateType === 'custom') {
-    let f = filterState.from || isoLocal(today);
-    let t = filterState.to   || isoLocal(today);
-    if (f > t) [f, t] = [t, f];
-    return { from: f, to: t };
+async function exportFullExcel () {
+  try {
+    const wb = buildFullWorkbook();
+    const stamp = todayISO();
+    await deliverWorkbook(wb, `aadhithran-full-${stamp}.xlsx`);
+  } catch (e) {
+    toast('Excel export failed: ' + e.message, { success:false });
   }
-  const p = filterState.preset;
-  if (p === 'today') return { from: isoLocal(today), to: isoLocal(today) };
-  if (p === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); return { from: isoLocal(d), to: isoLocal(d) }; }
-  if (p === '7d') { const d = new Date(today); d.setDate(d.getDate()-6); return { from: isoLocal(d), to: isoLocal(today) }; }
-  if (p === '30d') { const d = new Date(today); d.setDate(d.getDate()-29); return { from: isoLocal(d), to: isoLocal(today) }; }
-  if (p === 'month') return { from: isoLocal(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoLocal(today) };
-  if (p === 'last_month') {
-    const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
-    const e = new Date(today.getFullYear(), today.getMonth(), 0);
-    return { from: isoLocal(s), to: isoLocal(e) };
-  }
-  if (p === 'all') return { from: '1970-01-01', to: isoLocal(today) };
-  return { from: isoLocal(today), to: isoLocal(today) };
 }
-function applyFilters (rows) {
-  const { from, to } = resolveDateRange();
-  let out = rows.filter(r => r.date >= from && r.date <= to);
-  if (filterState.operatorId !== 'all') out = out.filter(r => r.empId === filterState.operatorId);
-  if (filterState.line !== 'all') out = out.filter(r => r.line === filterState.line);
-  if (filterState.bundleId !== 'all') out = out.filter(r => r.bundleId === filterState.bundleId);
-  if (filterState.operation !== 'all') out = out.filter(r => r.operation === filterState.operation);
-  return out;
-}
-function applyExpenseFilters (rows) {
-  const { from, to } = resolveDateRange();
-  let out = rows.filter(r => r.date >= from && r.date <= to);
-  if (filterState.category !== 'all') out = out.filter(r => r.category === filterState.category);
-  return out;
-}
-function getFilteredStats () {
-  const rows = applyFilters(DB.production);
-  const expenses = applyExpenseFilters(DB.expenses);
-  const pieces = rows.reduce((a,b) => a + b.qty, 0);
-  const rejects = rows.reduce((a,b) => a + b.reject, 0);
-  const cost = rows.reduce((a,b) => a + entryCost(b), 0);
-  const expenseTotal = expenses.reduce((a,b) => a + (Number(b.amount) || 0), 0);
-  const revenue = rows.reduce((a,b) => a + entryRevenue(b), 0);
-  const net = revenue - cost - expenseTotal;
-  const margin = revenue > 0 ? (net / revenue) * 100 : 0;
-  return { rows, expenses, pieces, rejects, cost, expenseTotal, total: cost + expenseTotal, revenue, net, margin };
+async function downloadFullExcel () {
+  try {
+    const wb = buildFullWorkbook();
+    const stamp = todayISO();
+    const filename = `aadhithran-full-${stamp}.xlsx`;
+    const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+    const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
+    showSuccess(); toast('Saved: ' + filename);
+  } catch (e) { toast('Excel export failed: ' + e.message, { success:false }); }
 }
 
 function toast (msg, opts = {}) {
@@ -1354,7 +1769,7 @@ function refreshCurrentScreen () {
 window.refreshCurrentScreen = refreshCurrentScreen;
 $$('.tab').forEach(t => t.addEventListener('click', () => nav(t.dataset.sc)));
 $('#navBack').addEventListener('click', () => { currentReport = null; nav('reports'); });
-$('#navShare').addEventListener('click', () => shareReport());
+$('#navShare').addEventListener('click', () => shareReportExcel());
 $('#fab').addEventListener('click', () => addEntry());
 $('#syncIndicator').addEventListener('click', openSettingsSheet);
 
@@ -1450,7 +1865,7 @@ function renderHome () {
     { i:'i-grid', l:'Monthly', g:'purple', fn:'openReportMonthly' },
     { i:'i-clock', l:'Staff Hrs', g:'teal', fn:'openStaffHoursSheet' },
     { i:'i-repeat', l:'Recurring', g:'gray', fn:'openRecurringSheet' },
-    { i:'i-database', l:'Backup', g:'gold', fn:'openSettingsSheet' },
+    { i:'i-excel', l:'Excel', g:'gold', fn:'exportFullExcel' },
   ];
   $('#quick').innerHTML = q.map((x, i) => {
     const onclick = x.fn ? `onclick="${x.fn}()"` : (x.sc ? `onclick="nav('${x.sc}')"` : '');
@@ -3114,8 +3529,6 @@ function emptyState (iconId, title, text) {
   return `<div class="empty"><div class="eic">${icon(iconId)}</div><h4>${escapeHtml(title)}</h4><p>${escapeHtml(text)}</p><p style="font-size:12px;color:var(--text-3);margin-top:6px">Try widening the date range with the chips above.</p></div>`;
 }
 
-function shareReport () { toast('Use PDF button or screenshot'); }
-
 function openSettingsSheet () {
   const days = !META.lastBackup ? Infinity : Math.floor((Date.now() - META.lastBackup) / 86400000);
   const backupLabel = days === Infinity ? 'Never' : days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago';
@@ -3129,7 +3542,9 @@ function openSettingsSheet () {
       <div style="padding:14px;background:var(--surface-2);border-radius:12px">
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">State</span><b>${escapeHtml(statusLabel)}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last pull</span><b>${Sync.lastPull ? timeShort(Sync.lastPull) : '—'}</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Cloud payload</span><b>${META.cloudBytes ? fmtBytes(META.cloudBytes) + ' → ' + fmtBytes(META.cloudGz) : '—'}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Shards / local size</span><b>${Sync.shardIds().length} · ${fmtBytes(localBytes())}</b></div>
       </div>
     </div>
     <div class="field">
@@ -3138,10 +3553,16 @@ function openSettingsSheet () {
       <button class="btn emerald" id="syncPushBtn">${icon('i-cloud-up')} Push</button>
     </div>
     <div class="field">
-      <label>Local Backup</label>
+      <label>Excel Export</label>
+      <button class="btn emerald" id="doExcelShareBtn" style="margin-bottom:8px">${icon('i-excel')} Share full workbook</button>
+      <button class="btn outline" id="doExcelDownloadBtn">${icon('i-download')} Download full workbook</button>
+      <div class="hint">All data as a multi-sheet .xlsx: employees, production, expenses, advances, staff hours, recurring templates.</div>
+    </div>
+    <div class="field">
+      <label>JSON Backup</label>
       <button class="btn gray" id="doBackupBtn" style="margin-bottom:8px">${icon('i-download')} Export backup file</button>
       <button class="btn outline" id="doRestoreBtn">${icon('i-upload')} Restore from backup</button>
-      <div class="hint">Last file backup: <b>${escapeHtml(backupLabel)}</b></div>
+      <div class="hint">Last export: <b>${escapeHtml(backupLabel)}</b></div>
     </div>
     ${pinSection}
     <div class="field">
@@ -3153,6 +3574,8 @@ function openSettingsSheet () {
   setTimeout(() => {
     $('#syncPullBtn').addEventListener('click', async () => { closeSheet(); await Sync.pull(false); });
     $('#syncPushBtn').addEventListener('click', async () => { closeSheet(); await Sync.push(true); });
+    $('#doExcelShareBtn').addEventListener('click', exportFullExcel);
+    $('#doExcelDownloadBtn').addEventListener('click', downloadFullExcel);
     $('#doBackupBtn').addEventListener('click', backupNow);
     $('#doRestoreBtn').addEventListener('click', pickRestoreFile);
     $('#doClearBtn').addEventListener('click', confirmClearAll);
@@ -3184,6 +3607,118 @@ function openPinChangeSheet (role) {
   });
 }
 
+function bundleCostPerPiece (b) { return (b.ops || []).reduce((a,o) => a + (Number(o.rate) || 0), 0); }
+function entryCost (p) { return Number(p.amount) || 0; }
+function entryRevenue (p) {
+  const b = DB.bundles.find(x => x.id === p.bundleId);
+  if (!b || !b.sellingPrice) return 0;
+  const tc = bundleCostPerPiece(b);
+  if (!tc) return 0;
+  return (Number(p.qty) || 0) * b.sellingPrice * ((Number(p.rate) || 0) / tc);
+}
+
+const filterState = {
+  dateType: 'preset', preset: 'today', from: '', to: '',
+  operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all',
+};
+function resolveDateRange () {
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (filterState.dateType === 'custom') {
+    let f = filterState.from || isoLocal(today);
+    let t = filterState.to   || isoLocal(today);
+    if (f > t) [f, t] = [t, f];
+    return { from: f, to: t };
+  }
+  const p = filterState.preset;
+  if (p === 'today') return { from: isoLocal(today), to: isoLocal(today) };
+  if (p === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); return { from: isoLocal(d), to: isoLocal(d) }; }
+  if (p === '7d') { const d = new Date(today); d.setDate(d.getDate()-6); return { from: isoLocal(d), to: isoLocal(today) }; }
+  if (p === '30d') { const d = new Date(today); d.setDate(d.getDate()-29); return { from: isoLocal(d), to: isoLocal(today) }; }
+  if (p === 'month') return { from: isoLocal(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoLocal(today) };
+  if (p === 'last_month') {
+    const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
+    const e = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { from: isoLocal(s), to: isoLocal(e) };
+  }
+  if (p === 'all') return { from: '1970-01-01', to: isoLocal(today) };
+  return { from: isoLocal(today), to: isoLocal(today) };
+}
+function applyFilters (rows) {
+  const { from, to } = resolveDateRange();
+  let out = rows.filter(r => r.date >= from && r.date <= to);
+  if (filterState.operatorId !== 'all') out = out.filter(r => r.empId === filterState.operatorId);
+  if (filterState.line !== 'all') out = out.filter(r => r.line === filterState.line);
+  if (filterState.bundleId !== 'all') out = out.filter(r => r.bundleId === filterState.bundleId);
+  if (filterState.operation !== 'all') out = out.filter(r => r.operation === filterState.operation);
+  return out;
+}
+function applyExpenseFilters (rows) {
+  const { from, to } = resolveDateRange();
+  let out = rows.filter(r => r.date >= from && r.date <= to);
+  if (filterState.category !== 'all') out = out.filter(r => r.category === filterState.category);
+  return out;
+}
+function getFilteredStats () {
+  const rows = applyFilters(DB.production);
+  const expenses = applyExpenseFilters(DB.expenses);
+  const pieces = rows.reduce((a,b) => a + b.qty, 0);
+  const rejects = rows.reduce((a,b) => a + b.reject, 0);
+  const cost = rows.reduce((a,b) => a + entryCost(b), 0);
+  const expenseTotal = expenses.reduce((a,b) => a + (Number(b.amount) || 0), 0);
+  const revenue = rows.reduce((a,b) => a + entryRevenue(b), 0);
+  const net = revenue - cost - expenseTotal;
+  const margin = revenue > 0 ? (net / revenue) * 100 : 0;
+  return { rows, expenses, pieces, rejects, cost, expenseTotal, total: cost + expenseTotal, revenue, net, margin };
+}
+
+async function backupNow () {
+  try {
+    const payload = { _app:'aadhithran-erp', _version:13, _exported:new Date().toISOString(), data: DB };
+    const json = JSON.stringify(payload, null, 2);
+    const stamp = new Date().toISOString().slice(0,10);
+    const filename = 'aadhithran-backup-' + stamp + '.json';
+    const blob = new Blob([json], { type:'application/json' });
+    const file = new File([blob], filename, { type:'application/json' });
+    if (navigator.canShare && navigator.canShare({ files:[file] })) {
+      try {
+        await navigator.share({ files:[file], title:'Aadhithran backup', text:'Backup ' + stamp });
+        META.lastBackup = Date.now(); persistMeta(); showSuccess(); toast('Backup shared'); return;
+      } catch (err) { if (err && err.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
+    META.lastBackup = Date.now(); persistMeta();
+    showSuccess(); toast('Backup saved');
+  } catch (e) { toast('Backup failed: ' + e.message, { success:false }); }
+}
+function pickRestoreFile () {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json,.json';
+  input.onchange = async (e) => {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const remote = parsed && parsed._app === 'aadhithran-erp' ? parsed.data : parsed;
+      if (!remote || !Array.isArray(remote.employees)) throw new Error('Not a valid backup');
+      if (!confirm('Restore this backup? This will replace local data and push to cloud.')) return;
+      const liveSession = DB.session;
+      DB = { ...remote, session: liveSession || null, _lastModified: Date.now() };
+      save(); showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
+    } catch (err) { toast('Restore failed: ' + err.message, { success:false }); }
+  };
+  input.click();
+}
+function confirmClearAll () {
+  if (!confirm('Delete ALL data on this device AND cloud bin?')) return;
+  if (prompt('Type DELETE to confirm:') !== 'DELETE') { toast('Cancelled'); return; }
+  const liveSession = DB.session;
+  DB = seed(); DB.session = liveSession; DB._lastModified = Date.now();
+  save(); setTimeout(() => Sync.push(true), 500);
+  showSuccess(); toast('Cleared'); closeSheet(); refreshCurrentScreen();
+}
+
 setLoginRole('admin');
 updatePinSlots();
 
@@ -3204,8 +3739,8 @@ $('#teamAddBtn').addEventListener('click', () => {
   else if (teamTab === 'operations') openNewMasterOp();
   else openNewCompanyStaff();
 });
-$('#shareBtn').addEventListener('click', shareReport);
-$('#exportPdfBtn').addEventListener('click', () => window.print());
+$('#shareExcelBtn').addEventListener('click', shareReportExcel);
+$('#downloadExcelBtn').addEventListener('click', downloadReportExcel);
 
 attachRipple();
 updateSyncIndicator();
