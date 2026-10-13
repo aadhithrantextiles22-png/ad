@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0F766E">
 <title>Aadhithran Enterprises — Garment ERP</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -97,6 +96,7 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 .hero .hero-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.78);display:flex;align-items:center;gap:5px}
 .hero .hero-label svg{width:12px;height:12px}
 .hero .hero-badge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:100px;background:rgba(255,255,255,.2);display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,.22)}
+.hero .hero-badge svg{animation:softGlow 2.4s ease-out infinite}
 .hero .hero-amount{font-size:34px;font-weight:800;letter-spacing:-.045em;line-height:1.05;font-variant-numeric:tabular-nums}
 .hero .hero-sub{margin-top:5px;font-size:12px;color:rgba(255,255,255,.88);font-weight:500}
 .hero .hero-row{display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18)}
@@ -443,6 +443,17 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 .adv-set-chip.out{background:#FEE2E2;color:#991B1B}
 .adv-set-chip.on{background:var(--emerald-lt);color:var(--emerald-dk)}
 
+/* ── NEW: tally / payment rows ── */
+.tally-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0}
+.tally-row .tl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.tally-row .tv{font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+.tally-sec-hd{font-size:10.5px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;padding:10px 0 6px;border-top:1px dashed var(--separator-2);margin-top:8px;display:flex;justify-content:space-between;align-items:center}
+.tally-sec-hd:first-child{border-top:none;margin-top:0;padding-top:2px}
+.tally-actions{display:flex;gap:8px;padding:0 16px 12px}
+.tally-actions .btn{flex:1;min-width:0}
+.tally-badge{background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800}
+.tally-badge.due{background:#FEE2E2;color:#991B1B}
+
 @keyframes rippleAnim{to{transform:scale(2.4);opacity:0}}
 @keyframes popIn{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
 @keyframes slideUpFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -450,6 +461,17 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 @keyframes heroPulse{0%,100%{box-shadow:0 12px 30px -10px rgba(15,118,110,.55)}50%{box-shadow:0 16px 42px -8px rgba(15,118,110,.78)}}
 @keyframes sheetIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
 @keyframes fabPop{0%{transform:scale(0) rotate(-90deg)}70%{transform:scale(1.12) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
+
+@media print{
+  body{background:#fff;overflow:visible}
+  .app-header,.tabbar,.fab,.filter-bar,.custom-date-row,.active-filter-strip,.share-btn,#exportPdfBtn,.reports-top-pad,.month-nav,.tally-actions{display:none !important}
+  .screens{padding:0;overflow:visible}
+  .screen:not(.active){display:none !important}
+  #reportContent{padding:0}
+  .grid-scroll{overflow:visible}
+  .grid-table th{background:#0F766E !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .grid-table td.has-val{background:#D1FAE5 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
@@ -493,7 +515,7 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
   <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
   <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></symbol>
   <symbol id="i-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 1 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-3a2 2 0 1 1 4 0"/></symbol>
-  <symbol id="i-excel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/><path d="M14 2v6h6"/><path d="m9 13 6 6M15 13l-6 6"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.4"/></symbol>
 </svg>
 
 <div class="login" id="loginScreen">
@@ -604,8 +626,8 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
       <div id="monthNavWrap"></div>
       <div id="activeFilterStrip" class="active-filter-strip"></div>
       <div id="reportContent"></div>
-      <button class="share-btn" id="shareExcelBtn"><svg><use href="#i-excel"/></svg>Share as Excel</button>
-      <div style="padding:0 16px 8px"><button class="btn outline" id="downloadExcelBtn"><svg><use href="#i-download"/></svg>Download Excel (.xlsx)</button></div>
+      <button class="share-btn" id="shareBtn"><svg><use href="#i-share"/></svg>Share Report</button>
+      <div style="padding:0 16px 8px"><button class="btn outline" id="exportPdfBtn"><svg><use href="#i-pdf"/></svg>Export as PDF (A4)</button></div>
       <div style="height:20px"></div>
     </div>
   </div>
@@ -639,18 +661,21 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    AADHITHRAN ERP — v13
-   Single-file package: gzip+shard cloud sync + Excel export.
+   Changes in this version:
+     • Advance Ledger — payment tally (record / delete payments per person)
+     • Staff attendance — editable date (log hours for any day)
+     • Monthly Grid — per-person operation breakdown
+     • Proper A4 PDF export for every report (incl. advance ledger)
    ═══════════════════════════════════════════════════════════════════ */
 
 const LS = 'aadhithran_erp_v12';
-const META_LS = 'aadhithran_meta_v13';
+const META_LS = 'aadhithran_meta_v12';
 
 const JSONBIN_API_KEY = '$2a$10$B8zPn16pugEhGeSU1agI4uWaUQYBeCFMWryHYKZJ4/6LoDL0SziFy';
 const JSONBIN_BIN_ID  = '6aba0ef1ffd5d1605336a452';
 const JSONBIN_BASE    = 'https://api.jsonbin.io/v3/b';
 const SYNC_INTERVAL   = 30 * 1000;
 const PUSH_DEBOUNCE   = 3000;
-const SHARD_CHARS     = 85000;   // base64 chars per shard (~85 KB, under JSONBin free 100 KB cap)
 
 const LINES = ['L-01','L-02','L-03','L-04'];
 const SKILLS = ['Tailor','Checker','Helper','Ironman','Cutter','Packer','Supervisor'];
@@ -698,6 +723,9 @@ function staffHoursToday (staffId) {
   const t = todayISO();
   return DB.staffHours.find(h => h.staffId === staffId && h.date === t);
 }
+function staffHoursOn (staffId, date) {
+  return DB.staffHours.find(h => h.staffId === staffId && h.date === date);
+}
 function staffMonthTotal (staffId, month) {
   return DB.staffHours.filter(h => h.staffId === staffId && h.date.slice(0,7) === month)
     .reduce((a,b) => a + (Number(b.amount) || 0), 0);
@@ -729,10 +757,24 @@ function deleteStaffHours (id) {
   save();
 }
 
+/* ══════════ ADVANCE TALLY HELPERS ══════════ */
+function advancePaymentsFor (personType, personId) {
+  return (DB.advancePayments || []).filter(p => p.personType === personType && p.personId === personId);
+}
+function advanceTotals (personType, personId) {
+  const advances = DB.advances.filter(a => a.personType === personType && a.personId === personId);
+  const tallyAdvance = advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount) || 0), 0);
+  const waived       = advances.filter(a =>  a.settled).reduce((s,a) => s + (Number(a.amount) || 0), 0);
+  const paid         = advancePaymentsFor(personType, personId).reduce((s,p) => s + (Number(p.amount) || 0), 0);
+  return {
+    advanceTotal: tallyAdvance,
+    waivedTotal: waived,
+    paidTotal: paid,
+    outstanding: Math.max(0, tallyAdvance - paid),
+  };
+}
 function advanceOutstanding (personType, personId) {
-  return DB.advances
-    .filter(a => a.personType === personType && a.personId === personId && !a.settled)
-    .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  return advanceTotals(personType, personId).outstanding;
 }
 function advanceTotalInPeriod (personType, personId, from, to) {
   return DB.advances
@@ -740,13 +782,19 @@ function advanceTotalInPeriod (personType, personId, from, to) {
     .filter(a => a.date >= from && a.date <= to)
     .reduce((s, a) => s + (Number(a.amount) || 0), 0);
 }
+function advancePaidInPeriod (personType, personId, from, to) {
+  return (DB.advancePayments || [])
+    .filter(p => p.personType === personType && p.personId === personId)
+    .filter(p => p.date >= from && p.date <= to)
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+}
 function toggleAdvanceSettled (id) {
   const a = DB.advances.find(x => x.id === id);
   if (!a) return;
   a.settled = !a.settled;
   save();
   showSuccess();
-  toast(a.settled ? 'Marked settled' : 'Marked outstanding');
+  toast(a.settled ? 'Waived from tally' : 'Restored to tally');
   if (currentReport === 'advance') renderReportContent();
 }
 window.toggleAdvanceSettled = toggleAdvanceSettled;
@@ -759,6 +807,123 @@ function deleteAdvance (id) {
   if (currentReport === 'advance') renderReportContent();
 }
 window.deleteAdvance = deleteAdvance;
+function deleteAdvancePayment (id) {
+  if (!confirm('Delete this tally payment entry?')) return;
+  DB.advancePayments = (DB.advancePayments || []).filter(x => x.id !== id);
+  save();
+  showSuccess();
+  toast('Payment removed');
+  if (currentReport === 'advance') renderReportContent();
+}
+window.deleteAdvancePayment = deleteAdvancePayment;
+
+/* ══════════ TALLY PAYMENT SHEET ══════════ */
+function openAdvancePaymentSheet (preType, preId) {
+  const activeEmps = DB.employees.filter(x => x.status === 'Active');
+  const staffList  = DB.companyStaff;
+  if (!activeEmps.length && !staffList.length) { toast('Add people first', {success:false}); return; }
+
+  const initType = preType || (activeEmps.length ? 'operator' : 'staff');
+  const initId   = preId || (initType === 'operator' ? (activeEmps[0] && activeEmps[0].id) : (staffList[0] && staffList[0].id)) || '';
+
+  const optionsFor = (type, sel) => {
+    if (type === 'operator') {
+      if (!activeEmps.length) return '<option value="">No active operators</option>';
+      return activeEmps.map(e =>
+        `<option value="${e.id}" ${e.id === sel ? 'selected' : ''}>${escapeHtml(e.name)} · ${escapeHtml(e.id)} · ${escapeHtml(e.line)}</option>`
+      ).join('');
+    }
+    if (!staffList.length) return '<option value="">No staff</option>';
+    return staffList.map(s =>
+      `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${escapeHtml(s.name)} · ${escapeHtml(s.role || 'Staff')}</option>`
+    ).join('');
+  };
+
+  const html = `
+    <div class="field"><label>Type</label>
+      <div class="chip-row" id="payType">
+        <button type="button" class="${initType === 'operator' ? 'on' : ''}" data-v="operator">Operator</button>
+        <button type="button" class="${initType === 'staff' ? 'on' : ''}" data-v="staff">Company Staff</button>
+      </div>
+    </div>
+    <div class="field"><label>Person</label><select id="payPerson">${optionsFor(initType, initId)}</select></div>
+    <div class="advance-box" id="paySummary" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);border-color:rgba(5,150,105,.25)">
+      <div class="ab-row"><span class="ab-l" style="color:var(--emerald-dk)">Outstanding Now</span><span class="ab-v" style="color:var(--emerald-dk)" id="payOutstanding">₹0</span></div>
+      <div class="ab-row"><span class="ab-l" style="color:var(--emerald-dk)">After This Payment</span><span class="ab-v sm" style="color:var(--emerald-dk)" id="payAfter">₹0</span></div>
+    </div>
+    <div class="field"><label>Payment Date</label><input id="payDate" type="date" value="${todayISO()}"></div>
+    <div class="field"><label>Amount Paid (₹)</label><input id="payAmount" type="number" inputmode="decimal" min="0" step="1" placeholder="0"></div>
+    <div class="field"><label>Note (optional)</label><input id="payNote" placeholder="e.g. Cash settlement"></div>
+    <button type="button" class="btn outline sm" id="payFull" style="width:100%">Tally full outstanding</button>
+  `;
+
+  openSheet('Tally Advance Payment', html, () => {
+    const typeBtn = $('#payType .on');
+    const personType = typeBtn ? typeBtn.dataset.v : 'operator';
+    const personId = $('#payPerson').value;
+    const amount = Number($('#payAmount').value) || 0;
+    if (!personId) { toast('Select a person', {success:false}); return false; }
+    if (amount <= 0) { toast('Enter an amount', {success:false}); return false; }
+
+    let personName = '';
+    if (personType === 'operator') {
+      const e = DB.employees.find(x => x.id === personId);
+      if (!e) { toast('Person not found', {success:false}); return false; }
+      personName = e.name;
+    } else {
+      const s = DB.companyStaff.find(x => x.id === personId);
+      if (!s) { toast('Person not found', {success:false}); return false; }
+      personName = s.name;
+    }
+    DB.advancePayments = DB.advancePayments || [];
+    DB.advancePayments.push({
+      id: uid('pay'), personType, personId, personName,
+      date: $('#payDate').value || todayISO(),
+      amount, note: $('#payNote').value.trim(),
+      ts: Date.now(),
+    });
+    save(); showSuccess();
+    toast('Payment of ' + money(amount) + ' tallied');
+    if (currentReport === 'advance') renderReportContent();
+    else refreshCurrentScreen();
+    return true;
+  });
+
+  setTimeout(() => {
+    const updateSummary = () => {
+      const typeBtn = $('#payType .on');
+      const personType = typeBtn ? typeBtn.dataset.v : 'operator';
+      const personId = $('#payPerson').value;
+      if (!personId) { $('#payOutstanding').textContent = '₹0'; $('#payAfter').textContent = '₹0'; return; }
+      const cur = advanceOutstanding(personType, personId);
+      const amt = Number($('#payAmount').value) || 0;
+      $('#payOutstanding').textContent = money(cur);
+      $('#payAfter').textContent = money(Math.max(0, cur - amt));
+    };
+    $$('#payType button').forEach(b => b.addEventListener('click', () => {
+      $$('#payType button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      const sel = $('#payPerson');
+      sel.innerHTML = optionsFor(b.dataset.v, '');
+      updateSummary();
+    }));
+    const pSel = $('#payPerson'); if (pSel) pSel.addEventListener('change', updateSummary);
+    const aInp = $('#payAmount'); if (aInp) aInp.addEventListener('input', updateSummary);
+    const fBtn = $('#payFull');
+    if (fBtn) fBtn.addEventListener('click', () => {
+      const typeBtn = $('#payType .on');
+      const personType = typeBtn ? typeBtn.dataset.v : 'operator';
+      const personId = $('#payPerson').value;
+      if (!personId) return;
+      const cur = advanceOutstanding(personType, personId);
+      $('#payAmount').value = cur > 0 ? cur : '';
+      updateSummary();
+      haptic('light');
+    });
+    updateSummary();
+  }, 60);
+}
+window.openAdvancePaymentSheet = openAdvancePaymentSheet;
 
 function nextRunHint (r) {
   const start = new Date(r.startDate + 'T00:00:00');
@@ -883,7 +1048,7 @@ function seed () {
   ];
   return {
     employees, bundles, masterOps, production,
-    expenses: [], advances: [],
+    expenses: [], advances: [], advancePayments: [],
     recents: ['EMP-021', 'EMP-014', 'EMP-008'],
     companyStaff, staffHours: [], recurring: [],
     admin:   { pin:'1234', name:'Admin' },
@@ -918,6 +1083,9 @@ DB.recurring = Array.isArray(DB.recurring) ? DB.recurring.map(r => ({
 DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({
   ...a, amount: Number(a.amount) || 0, settled: a.settled === true,
 })) : [];
+DB.advancePayments = Array.isArray(DB.advancePayments) ? DB.advancePayments.map(p => ({
+  ...p, amount: Number(p.amount) || 0,
+})) : [];
 DB.admin = DB.admin || { pin:'1234', name:'Admin' };
 DB.account = DB.account || { pin:'1605', name:'Account' };
 DB.session = DB.session || null;
@@ -927,9 +1095,6 @@ DB._lastModified = DB._lastModified || Date.now();
 let META;
 try { META = JSON.parse(localStorage.getItem(META_LS) || '{}'); } catch (e) { META = {}; }
 META.lastBackup = META.lastBackup || null;
-META.shardIds   = Array.isArray(META.shardIds) ? META.shardIds : [];
-META.cloudBytes = META.cloudBytes || 0;
-META.cloudGz    = META.cloudGz || 0;
 function persistMeta () { try { localStorage.setItem(META_LS, JSON.stringify(META)); } catch(e){} }
 
 function save () {
@@ -945,180 +1110,59 @@ let currentSession = null;
 const isAdmin   = () => currentSession && currentSession.role === 'admin';
 const isAccount = () => currentSession && currentSession.role === 'account';
 
-/* ═══ Cloud payload compression + sharding ══════════════════════════
-   JSONBin free plan rejects any record > 100 KB. We gzip the whole DB
-   and, if needed, split the base64 across extra shard bins.
-   ══════════════════════════════════════════════════════════════════ */
-function fmtBytes (n) {
-  n = Number(n) || 0;
-  if (n < 1024) return n + ' B';
-  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-  return (n / 1048576).toFixed(2) + ' MB';
-}
-function bytesToBase64 (bytes) {
-  let bin = '';
-  const CH = 0x8000;
-  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
-  return btoa(bin);
-}
-function base64ToBytes (b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-async function gzipB64 (str) {
-  if (typeof CompressionStream === 'undefined') throw new Error('Browser cannot compress (needs iOS 16.4+ / modern Chrome).');
-  const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
-  const buf = await new Response(stream).arrayBuffer();
-  return bytesToBase64(new Uint8Array(buf));
-}
-async function gunzipB64 (b64) {
-  if (typeof DecompressionStream === 'undefined') throw new Error('Browser cannot decompress.');
-  const bytes = base64ToBytes(b64);
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return await new Response(stream).text();
-}
-function normalizeRemote (remote, liveSession) {
-  return {
-    ...remote,
-    employees: Array.isArray(remote.employees) ? remote.employees : [],
-    bundles: (remote.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] })),
-    masterOps: Array.isArray(remote.masterOps) ? remote.masterOps : [],
-    expenses: Array.isArray(remote.expenses) ? remote.expenses : [],
-    advances: Array.isArray(remote.advances) ? remote.advances.map(a => ({ ...a, amount: Number(a.amount) || 0, settled: a.settled === true })) : [],
-    production: Array.isArray(remote.production) ? remote.production : [],
-    recents: remote.recents || [],
-    companyStaff: (remote.companyStaff || []).map(s => ({
-      ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
-    })),
-    staffHours: Array.isArray(remote.staffHours) ? remote.staffHours : [],
-    recurring: Array.isArray(remote.recurring) ? remote.recurring : [],
-    admin: remote.admin || { pin:'1234', name:'Admin' },
-    account: remote.account || { pin:'1605', name:'Account' },
-    session: liveSession || remote.session || null,
-    version: 13,
-  };
-}
-function localBytes () { try { return (localStorage.getItem(LS) || '').length; } catch (e) { return 0; } }
-
 const Sync = {
   status: 'idle', lastPull: null, lastPush: null, lastError: null, remoteTs: 0,
-  cloudRaw: 0, cloudGz: 0,
   _inFlight: false, _pushTimer: null, _pollTimer: null,
-  _bootstrapped: false, _pendingPush: false, _legacyRemote: false,
-
+  _bootstrapped: false, _pendingPush: false,
   headers () { return { 'Content-Type':'application/json', 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta':'false' }; },
   setStatus (s) { this.status = s; updateSyncIndicator(); },
-
-  shardIds () { return Array.isArray(META.shardIds) ? META.shardIds : []; },
-  setShardIds (ids) { META.shardIds = Array.isArray(ids) ? ids : []; persistMeta(); },
-
-  async _get (binId) {
-    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}/latest`, {
-      method: 'GET',
-      headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
-      cache: 'no-store',
-    });
-    if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error(`HTTP ${r.status}${t ? ' — ' + t.slice(0,120) : ''}`); }
-    return await r.json();
-  },
-  async _put (binId, obj) {
-    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}`, {
-      method: 'PUT', headers: this.headers(), body: JSON.stringify(obj),
-    });
-    if (!r.ok) {
-      const t = await r.text().catch(() => '');
-      if (r.status === 403 && /100\s*kb/i.test(t)) throw new Error('Record exceeds JSONBin 100 KB free limit');
-      throw new Error(`HTTP ${r.status}${t ? ' — ' + t.slice(0,120) : ''}`);
-    }
-    return r.json().catch(() => ({}));
-  },
-  async _create (obj, name) {
-    const r = await fetch(JSONBIN_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Name': name, 'X-Bin-Private': 'true' },
-      body: JSON.stringify(obj),
-    });
-    if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error(`HTTP ${r.status}${t ? ' — ' + t.slice(0,120) : ''}`); }
-    const j = await r.json();
-    const id = (j && j.metadata && j.metadata.id) || (j && j.id);
-    if (!id) throw new Error('Bin created but no id returned');
-    return id;
-  },
-  async _delete (binId) {
-    try { await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}`, { method:'DELETE', headers: { 'X-Master-Key': JSONBIN_API_KEY } }); } catch (e) {}
-  },
-
-  async _writeCompressed (rawJson, ts) {
-    const b64 = await gzipB64(rawJson);
-    this.cloudRaw = rawJson.length;
-    this.cloudGz  = b64.length;
-    META.cloudBytes = rawJson.length;
-    META.cloudGz    = b64.length;
-    persistMeta();
-
-    if (b64.length <= SHARD_CHARS) {
-      await this._put(JSONBIN_BIN_ID, { _v: 13, _gz: 1, _ts: ts, d: b64 });
-      const old = this.shardIds();
-      if (old.length) { old.forEach(id => this._delete(id)); this.setShardIds([]); }
-      return { shards: 0, bytes: b64.length };
-    }
-
-    const parts = [];
-    for (let i = 0; i < b64.length; i += SHARD_CHARS) parts.push(b64.slice(i, i + SHARD_CHARS));
-
-    let ids = this.shardIds().slice();
-    while (ids.length < parts.length) {
-      const id = await this._create({ _v:13, _shard: ids.length, d:'' }, 'aadhithran-shard-' + (ids.length + 1));
-      ids.push(id);
-    }
-    for (let i = 0; i < parts.length; i++) await this._put(ids[i], { _v:13, _shard:i, d: parts[i] });
-    const used = ids.slice(0, parts.length);
-    await this._put(JSONBIN_BIN_ID, { _v:13, _gz:1, _ts: ts, _parts: parts.length, _bins: used });
-    if (ids.length > parts.length) ids.slice(parts.length).forEach(id => this._delete(id));
-    this.setShardIds(used);
-    return { shards: parts.length, bytes: b64.length };
-  },
-
-  async _readRemote () {
-    const rec = await this._get(JSONBIN_BIN_ID);
-    if (!rec) return null;
-
-    if (rec._gz) {
-      let b64 = rec.d || '';
-      let shards = [];
-      if (rec._parts > 1 && Array.isArray(rec._bins)) {
-        shards = rec._bins.slice(0, rec._parts);
-        const chunks = await Promise.all(shards.map(id => this._get(id)));
-        b64 = chunks.map(c => (c && c.d) || '').join('');
-      }
-      this.setShardIds(shards);
-      return JSON.parse(await gunzipB64(b64));
-    }
-
-    this._legacyRemote = true;
-    return rec.record ? rec.record : rec;
-  },
-
   async pull (silent = false, forceReplace = false) {
     if (this._inFlight) return 'busy';
     this._inFlight = true;
     this.setStatus('pulling');
     try {
-      const remote = await this._readRemote();
+      const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(JSONBIN_BIN_ID)}/latest`, {
+        method: 'GET',
+        headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
+        cache: 'no-store',
+      });
+      if (!r.ok) {
+        const body = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status}${body ? ' — ' + body.slice(0, 140) : ''}`);
+      }
+      const j = await r.json();
+      const remote = j && j.record ? j.record : j;
       if (!remote || !Array.isArray(remote.employees) || remote.employees.length === 0) {
-        this.lastPull = Date.now(); this.lastError = null; this.setStatus('synced');
+        this.lastPull = Date.now(); this.lastError = null;
+        this.setStatus('synced');
         if (!silent) toast('Cloud is empty');
         return 'empty';
       }
       const remoteTs = remote._lastModified || 0;
       const localTs  = DB._lastModified  || 0;
       this.remoteTs = remoteTs;
-
       if (forceReplace || remoteTs > localTs) {
         const liveSession = DB.session;
-        DB = normalizeRemote(remote, liveSession);
+        DB = {
+          ...remote,
+          employees: Array.isArray(remote.employees) ? remote.employees : [],
+          bundles: (remote.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] })),
+          masterOps: Array.isArray(remote.masterOps) ? remote.masterOps : [],
+          expenses: Array.isArray(remote.expenses) ? remote.expenses : [],
+          advances: Array.isArray(remote.advances) ? remote.advances.map(a => ({ ...a, amount: Number(a.amount)||0, settled: a.settled === true })) : [],
+          advancePayments: Array.isArray(remote.advancePayments) ? remote.advancePayments.map(p => ({ ...p, amount: Number(p.amount)||0 })) : [],
+          production: Array.isArray(remote.production) ? remote.production : [],
+          recents: remote.recents || [],
+          companyStaff: (remote.companyStaff || []).map(s => ({
+            ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
+          })),
+          staffHours: Array.isArray(remote.staffHours) ? remote.staffHours : [],
+          recurring: Array.isArray(remote.recurring) ? remote.recurring : [],
+          admin: remote.admin || { pin:'1234', name:'Admin' },
+          account: remote.account || { pin:'1605', name:'Account' },
+          session: liveSession || remote.session || null,
+          version: 13,
+        };
         localStorage.setItem(LS, JSON.stringify(DB));
         if (!silent) toast('Synced from cloud');
         processRecurring();
@@ -1131,17 +1175,15 @@ const Sync = {
     } catch (e) {
       this.lastError = e.message;
       this.setStatus('error');
-      if (!silent) toast('Pull failed: ' + e.message, { success:false });
+      if (!silent) toast('Pull failed: ' + e.message, { success: false });
       return 'failed';
     } finally { this._inFlight = false; }
   },
-
   queuePush () {
     if (!this._bootstrapped) { this._pendingPush = true; return; }
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this.push(false), PUSH_DEBOUNCE);
   },
-
   async push (force = false) {
     if (this._inFlight) { this.queuePush(); return 'busy'; }
     this._pushTimer = null;
@@ -1149,43 +1191,40 @@ const Sync = {
     this.setStatus('pushing');
     const nextTs = Date.now();
     try {
-      const raw = JSON.stringify({ ...DB, _lastModified: nextTs });
-      const res = await this._writeCompressed(raw, nextTs);
-
+      const payload = JSON.stringify({ ...DB, _lastModified: nextTs });
+      const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(JSONBIN_BIN_ID)}`, {
+        method: 'PUT', headers: this.headers(), body: payload,
+      });
+      if (!r.ok) {
+        const body = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status}${body ? ' — ' + body.slice(0, 140) : ''}`);
+      }
       DB._lastModified = nextTs;
-      try { localStorage.setItem(LS, JSON.stringify(DB)); } catch (e) {}
+      localStorage.setItem(LS, JSON.stringify(DB));
       this.remoteTs = nextTs;
       this.lastPush = Date.now(); this.lastError = null;
       this.setStatus('synced');
-      if (force) toast('Pushed · ' + fmtBytes(this.cloudRaw) + ' → ' + fmtBytes(res.bytes) + (res.shards ? ' (' + res.shards + ' shards)' : ''));
+      if (force) toast('Pushed to cloud');
       return 'ok';
     } catch (e) {
       this.lastError = e.message;
       this.setStatus('error');
-      if (force) toast('Push failed: ' + e.message, { success:false });
+      if (force) toast('Push failed: ' + e.message, { success: false });
       return 'failed';
     } finally { this._inFlight = false; }
   },
-
   startPolling () { this.stopPolling(); this._pollTimer = setInterval(() => this.pull(true), SYNC_INTERVAL); },
   stopPolling () { if (this._pollTimer) clearInterval(this._pollTimer); this._pollTimer = null; },
-
   async bootstrap () {
     const result = await this.pull(true, isFreshSeed);
-
     if (result === 'failed') {
       this._bootstrapped = true;
       if (this._pendingPush) { this._pendingPush = false; this.queuePush(); }
-      this.startPolling();
-      return;
+      this.startPolling(); return;
     }
-    if (result === 'empty') {
-      await this.push(false);
-    } else if (result === 'ok') {
-      if (this._legacyRemote || (!isFreshSeed && (DB._lastModified || 0) > (this.remoteTs || 0))) {
-        this._legacyRemote = false;
-        await this.push(false);
-      }
+    if (result === 'empty') await this.push(false);
+    else if (result === 'ok') {
+      if (!isFreshSeed && (DB._lastModified || 0) > (this.remoteTs || 0)) await this.push(false);
     }
     isFreshSeed = false;
     this._bootstrapped = true;
@@ -1211,409 +1250,116 @@ function updateSyncIndicator () {
   el.title = map[s] || '';
 }
 
-/* ═══ Excel export ══════════════════════════════════════════════════
-   Uses SheetJS (loaded in <head>). Falls back to CSV if XLSX is
-   unavailable (e.g. first run offline with cold cache).
-   ══════════════════════════════════════════════════════════════════ */
-function safeSheetName (n) { return String(n).replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 31); }
-
-async function deliverWorkbook (wb, filename) {
-  if (typeof XLSX === 'undefined') throw new Error('Excel library not loaded — check your connection once, then retry.');
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-  // Try native share first (works in iOS Safari + Chrome Android)
+async function backupNow () {
   try {
-    const file = new File([blob], filename, { type: blob.type });
+    const payload = { _app:'aadhithran-erp', _version:13, _exported:new Date().toISOString(), data: DB };
+    const json = JSON.stringify(payload, null, 2);
+    const stamp = new Date().toISOString().slice(0,10);
+    const filename = 'aadhithran-backup-' + stamp + '.json';
+    const blob = new Blob([json], { type:'application/json' });
+    const file = new File([blob], filename, { type:'application/json' });
     if (navigator.canShare && navigator.canShare({ files:[file] })) {
-      await navigator.share({ files:[file], title: filename, text:'Aadhithran Enterprises export' });
-      META.lastBackup = Date.now(); persistMeta();
-      showSuccess(); toast('Shared: ' + filename);
-      return true;
+      try {
+        await navigator.share({ files:[file], title:'Aadhithran backup', text:'Backup ' + stamp });
+        META.lastBackup = Date.now(); persistMeta(); showSuccess(); toast('Backup shared'); return;
+      } catch (err) { if (err && err.name === 'AbortError') return; }
     }
-  } catch (e) {
-    if (e && e.name === 'AbortError') return false;   // user cancelled – silently stop
-  }
-
-  // Fallback: download
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
-  META.lastBackup = Date.now(); persistMeta();
-  showSuccess(); toast('Saved: ' + filename);
-  return true;
-}
-
-function workbookFromSheets (sheets, meta) {
-  const wb = XLSX.utils.book_new();
-
-  // Optional "About" sheet
-  if (meta) {
-    const about = [
-      ['Aadhithran Enterprises — Export'],
-      ['Generated', new Date().toLocaleString('en-IN')],
-      ['Range', meta.range || '—'],
-      ['Role', (currentSession && currentSession.role) || '—'],
-      ['App version', DB.version],
-      ['Rows', meta.rows || '—'],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(about);
-    ws['!cols'] = [{ wch: 22 }, { wch: 42 }];
-    XLSX.utils.book_append_sheet(wb, ws, 'About');
-  }
-
-  for (const [name, rows] of Object.entries(sheets)) {
-    if (!rows.length) continue;
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    // Auto width
-    const widths = (rows[0] || []).map((_, i) => {
-      let w = 10;
-      rows.forEach(r => { const v = String(r[i] == null ? '' : r[i]); if (v.length > w) w = Math.min(v.length, 42); });
-      return { wch: w + 2 };
-    });
-    ws['!cols'] = widths;
-    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(name));
-  }
-  return wb;
-}
-
-/* Build sheets for the currently-open report. */
-function buildCurrentReportSheets () {
-  const id = currentReport;
-  const out = {};
-  const { from, to } = resolveDateRange();
-  const rangeLabel = from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to);
-
-  const rows = applyFilters(DB.production);
-  const exps = applyExpenseFilters(DB.expenses);
-
-  if (id === 'monthly') {
-    const month = monthlyState.month || todayISO().slice(0,7);
-    const [y, m] = month.split('-').map(Number);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const days = Array.from({ length: daysInMonth }, (_, i) => isoLocal(new Date(y, m-1, i+1)));
-    const header = ['Name', 'Type', ...days.map((_, i) => 'Day ' + (i+1)), 'Total'];
-    const body = [];
-    DB.employees.forEach(emp => {
-      const byDate = {};
-      DB.production.forEach(p => {
-        if (p.empId !== emp.id || p.date.slice(0,7) !== month) return;
-        byDate[p.date] = (byDate[p.date] || 0) + (Number(p.amount) || 0);
-      });
-      const vals = days.map(d => Math.round(byDate[d] || 0));
-      const total = vals.reduce((a,b) => a + b, 0);
-      if (total === 0) return;
-      body.push([emp.name, 'Operator', ...vals, total]);
-    });
-    DB.companyStaff.forEach(s => {
-      const byDate = {};
-      DB.staffHours.forEach(h => {
-        if (h.staffId !== s.id || h.date.slice(0,7) !== month) return;
-        byDate[h.date] = (byDate[h.date] || 0) + (Number(h.amount) || 0);
-      });
-      const vals = days.map(d => Math.round(byDate[d] || 0));
-      const total = vals.reduce((a,b) => a + b, 0);
-      if (total === 0) return;
-      body.push([s.name, 'Company Staff', ...vals, total]);
-    });
-    out['Monthly Grid'] = [header, ...body];
-    return { sheets: out, meta: { range: month, rows: body.length } };
-  }
-
-  if (id === 'weekly') {
-    const anchor = new Date((monthlyState.week || todayISO()) + 'T00:00:00');
-    const dow = anchor.getDay();
-    const monOff = dow === 0 ? -6 : 1 - dow;
-    const mon = new Date(anchor); mon.setDate(anchor.getDate() + monOff);
-    const weekDays = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(mon); d.setDate(mon.getDate() + i); return isoLocal(d);
-    });
-    const header = ['Name', 'Type', ...weekDays, 'Total'];
-    const body = [];
-    DB.employees.forEach(emp => {
-      const byDate = {};
-      DB.production.forEach(p => {
-        if (p.empId !== emp.id || p.date < weekDays[0] || p.date > weekDays[6]) return;
-        byDate[p.date] = (byDate[p.date] || 0) + (Number(p.amount) || 0);
-      });
-      const vals = weekDays.map(d => Math.round(byDate[d] || 0));
-      const total = vals.reduce((a,b) => a + b, 0);
-      if (total === 0) return;
-      body.push([emp.name, 'Operator', ...vals, total]);
-    });
-    DB.companyStaff.forEach(s => {
-      const byDate = {};
-      DB.staffHours.forEach(h => {
-        if (h.staffId !== s.id || h.date < weekDays[0] || h.date > weekDays[6]) return;
-        byDate[h.date] = (byDate[h.date] || 0) + (Number(h.amount) || 0);
-      });
-      const vals = weekDays.map(d => Math.round(byDate[d] || 0));
-      const total = vals.reduce((a,b) => a + b, 0);
-      if (total === 0) return;
-      body.push([s.name, 'Company Staff', ...vals, total]);
-    });
-    out['Weekly Grid'] = [header, ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'salary') {
-    const byEmp = {};
-    rows.forEach(r => {
-      if (!byEmp[r.empId]) byEmp[r.empId] = { name:r.operatorName || '—', id:r.empId, line:r.line || '', pieces:0, rejects:0, wages:0 };
-      byEmp[r.empId].pieces += r.qty;
-      byEmp[r.empId].rejects += r.reject || 0;
-      byEmp[r.empId].wages += Number(r.amount) || 0;
-    });
-    const header = ['Employee ID', 'Name', 'Line', 'Pieces', 'Rejects', 'Wages', 'Advance (period)', 'Outstanding Advance', 'Net Payable'];
-    const body = Object.values(byEmp).sort((a,b) => b.wages - a.wages).map(e => {
-      const advIn = advanceTotalInPeriod('operator', e.id, from, to);
-      const advOut = advanceOutstanding('operator', e.id);
-      return [e.id, e.name, e.line, e.pieces, e.rejects, Math.round(e.wages), Math.round(advIn), Math.round(advOut), Math.round(e.wages - advIn)];
-    });
-    out['Salary'] = [header, ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'staffhours') {
-    const hours = DB.staffHours.filter(h => h.date >= from && h.date <= to);
-    const header = ['Date', 'Staff ID', 'Staff Name', 'Hours', 'Hourly Rate', 'Amount', 'Note'];
-    const body = hours.sort((a,b) => a.date.localeCompare(b.date)).map(h => [
-      h.date, h.staffId, h.staffName, h.hours, Number(h.hourlyRate.toFixed(2)), Math.round(h.amount), h.note || ''
-    ]);
-    out['Staff Hours'] = [header, ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'expense') {
-    const byCat = {};
-    exps.forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + Number(e.amount || 0); });
-    const catRows = [['Category', 'Amount'], ...Object.entries(byCat).sort((a,b) => b[1] - a[1]).map(([c,a]) => [c, Math.round(a)])];
-    const txRows  = [['Date', 'Category', 'Amount', 'Note', 'Auto'],
-      ...[...exps].sort((a,b) => a.date.localeCompare(b.date)).map(e => [e.date, e.category, Math.round(e.amount), e.note || '', e.auto ? 'Yes' : ''])];
-    out['By Category'] = catRows;
-    out['Transactions'] = txRows;
-    return { sheets: out, meta: { range: rangeLabel, rows: txRows.length - 1 } };
-  }
-
-  if (id === 'daily') {
-    const byDay = {};
-    rows.forEach(r => {
-      if (!byDay[r.date]) byDay[r.date] = { pcs:0, rej:0, wages:0, entries:0 };
-      byDay[r.date].pcs += r.qty; byDay[r.date].rej += r.reject||0; byDay[r.date].wages += Number(r.amount)||0; byDay[r.date].entries++;
-    });
-    const body = Object.keys(byDay).sort().map(d => [d, byDay[d].pcs, byDay[d].rej, Math.round(byDay[d].wages), byDay[d].entries]);
-    out['Daily'] = [['Date', 'Pieces', 'Rejects', 'Wages', 'Entries'], ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'operator') {
-    const byEmp = {};
-    rows.forEach(r => {
-      if (!byEmp[r.empId]) byEmp[r.empId] = { name:r.operatorName || '—', line:r.line || '', pieces:0, rejects:0, wages:0 };
-      byEmp[r.empId].pieces += r.qty; byEmp[r.empId].rejects += r.reject||0; byEmp[r.empId].wages += Number(r.amount)||0;
-    });
-    const body = Object.entries(byEmp).sort((a,b) => b[1].pieces - a[1].pieces)
-      .map(([id, e]) => [id, e.name, e.line, e.pieces, e.rejects, Math.round(e.wages)]);
-    out['Operators'] = [['Employee ID', 'Name', 'Line', 'Pieces', 'Rejects', 'Wages'], ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'bundle') {
-    const acc = isAccount();
-    const header = acc
-      ? ['Bundle', 'Style', 'Selling Price', 'Pieces', 'Rejects', 'Wages', 'Revenue', 'Margin']
-      : ['Bundle', 'Style', 'Cost/pc', 'Pieces', 'Rejects', 'Wages'];
-    const body = DB.bundles.filter(b => rows.some(r => r.bundleId === b.id)).map(b => {
-      const bRows = rows.filter(r => r.bundleId === b.id);
-      const pcs = bRows.reduce((a,r) => a + r.qty, 0);
-      const rej = bRows.reduce((a,r) => a + (r.reject||0), 0);
-      const wag = bRows.reduce((a,r) => a + (Number(r.amount)||0), 0);
-      if (acc) {
-        const rev = bRows.reduce((a,r) => a + entryRevenue(r), 0);
-        return [b.name, b.style || '', Number(b.sellingPrice || 0), pcs, rej, Math.round(wag), Math.round(rev), Math.round(rev - wag)];
-      }
-      return [b.name, b.style || '', bundleCostPerPiece(b), pcs, rej, Math.round(wag)];
-    });
-    out['Bundles'] = [header, ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'operation') {
-    const byOp = {};
-    rows.forEach(r => {
-      if (!byOp[r.operation]) byOp[r.operation] = { pcs:0, rej:0, wages:0, ops:new Set() };
-      byOp[r.operation].pcs += r.qty; byOp[r.operation].rej += r.reject||0; byOp[r.operation].wages += Number(r.amount)||0;
-      byOp[r.operation].ops.add(r.empId);
-    });
-    const body = Object.entries(byOp).sort((a,b) => b[1].pcs - a[1].pcs)
-      .map(([op, d]) => [op, d.pcs, d.rej, d.ops.size, Math.round(d.wages)]);
-    out['Operations'] = [['Operation', 'Pieces', 'Rejects', 'Operators', 'Wages'], ...body];
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'pnl') {
-    const s = getFilteredStats();
-    const summary = [
-      ['Metric', 'Amount'],
-      ['Revenue', Math.round(s.revenue)],
-      ['Operator Wages', Math.round(s.cost)],
-      ['Expenses', Math.round(s.expenseTotal)],
-      ['Net Profit', Math.round(s.net)],
-      ['Margin %', Number(s.margin.toFixed(2))],
-      ['Pieces Produced', s.pieces],
-    ];
-    const byDay = {};
-    s.rows.forEach(r => {
-      byDay[r.date] = byDay[r.date] || { rev:0, wage:0, exp:0 };
-      byDay[r.date].rev  += entryRevenue(r);
-      byDay[r.date].wage += entryCost(r);
-    });
-    s.expenses.forEach(e => {
-      byDay[e.date] = byDay[e.date] || { rev:0, wage:0, exp:0 };
-      byDay[e.date].exp += Number(e.amount || 0);
-    });
-    const daily = [['Date', 'Revenue', 'Wages', 'Expenses', 'Net'],
-      ...Object.keys(byDay).sort().map(d => {
-        const r = byDay[d];
-        return [d, Math.round(r.rev), Math.round(r.wage), Math.round(r.exp), Math.round(r.rev - r.wage - r.exp)];
-      })];
-    out['Summary'] = summary;
-    out['Daily'] = daily;
-    return { sheets: out, meta: { range: rangeLabel, rows: daily.length - 1 } };
-  }
-
-  if (id === 'advance') {
-    const header = ['Date', 'Type', 'Person ID', 'Person Name', 'Amount', 'Note', 'Status'];
-    const body = DB.advances
-      .filter(a => a.date >= from && a.date <= to)
-      .sort((a,b) => a.date.localeCompare(b.date))
-      .map(a => [a.date, a.personType, a.personId, a.personName, Math.round(a.amount), a.note || '', a.settled ? 'Settled' : 'Outstanding']);
-    const outstanding = [['Person Type', 'Person ID', 'Person Name', 'Outstanding'],
-      ...Object.values(DB.advances.filter(a => !a.settled).reduce((acc, a) => {
-        const k = a.personType + ':' + a.personId;
-        if (!acc[k]) acc[k] = { t:a.personType, id:a.personId, name:a.personName, amt:0 };
-        acc[k].amt += a.amount; return acc;
-      }, {})).map(p => [p.t, p.id, p.name, Math.round(p.amt)])];
-    out['Advances (period)'] = [header, ...body];
-    out['Outstanding (all-time)'] = outstanding;
-    return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-  }
-
-  if (id === 'recurring') {
-    const header = ['Category', 'Amount', 'Frequency', 'Start', 'End', 'Status', 'Next Run', 'Note'];
-    const body = DB.recurring.map(r => [
-      r.category, Number(r.amount), r.frequency, r.startDate, r.endDate || '',
-      r.active ? 'Active' : 'Paused', nextRunHint(r), r.note || ''
-    ]);
-    out['Recurring'] = [header, ...body];
-    return { sheets: out, meta: { range: 'All time', rows: body.length } };
-  }
-
-  // generic fallback: dump the filtered production rows
-  const header = ['Date', 'Operator', 'Emp ID', 'Line', 'Bundle', 'Operation', 'Rate', 'Qty', 'Reject', 'Reason', 'Amount', 'Notes'];
-  const body = rows.map(r => [r.date, r.operatorName || '', r.empId || '', r.line || '', r.bundleName || '', r.operation || '',
-    Number(r.rate) || 0, r.qty, r.reject || 0, r.rejectReason || '', Math.round(r.amount || 0), r.notes || '']);
-  out['Data'] = [header, ...body];
-  return { sheets: out, meta: { range: rangeLabel, rows: body.length } };
-}
-
-async function shareReportExcel () {
-  try {
-    const { sheets, meta } = buildCurrentReportSheets();
-    const wb = workbookFromSheets(sheets, meta);
-    const stamp = todayISO();
-    const safeTitle = (currentReport || 'report').replace(/[^a-z0-9]+/gi, '-');
-    await deliverWorkbook(wb, `aadhithran-${safeTitle}-${stamp}.xlsx`);
-  } catch (e) {
-    toast('Excel export failed: ' + e.message, { success:false });
-  }
-}
-async function downloadReportExcel () {
-  try {
-    const { sheets, meta } = buildCurrentReportSheets();
-    const wb = workbookFromSheets(sheets, meta);
-    const stamp = todayISO();
-    const safeTitle = (currentReport || 'report').replace(/[^a-z0-9]+/gi, '-');
-    const filename = `aadhithran-${safeTitle}-${stamp}.xlsx`;
-    const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
+    const a = document.createElement('a'); a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
     META.lastBackup = Date.now(); persistMeta();
-    showSuccess(); toast('Saved: ' + filename);
-  } catch (e) {
-    toast('Excel export failed: ' + e.message, { success:false });
+    showSuccess(); toast('Backup saved');
+  } catch (e) { toast('Backup failed: ' + e.message, { success:false }); }
+}
+function pickRestoreFile () {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json,.json';
+  input.onchange = async (e) => {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const remote = parsed && parsed._app === 'aadhithran-erp' ? parsed.data : parsed;
+      if (!remote || !Array.isArray(remote.employees)) throw new Error('Not a valid backup');
+      if (!confirm('Restore this backup? This will replace local data and push to cloud.')) return;
+      const liveSession = DB.session;
+      DB = { ...remote, session: liveSession || null, _lastModified: Date.now() };
+      save(); showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
+    } catch (err) { toast('Restore failed: ' + err.message, { success:false }); }
+  };
+  input.click();
+}
+function confirmClearAll () {
+  if (!confirm('Delete ALL data on this device AND cloud bin?')) return;
+  if (prompt('Type DELETE to confirm:') !== 'DELETE') { toast('Cancelled'); return; }
+  const liveSession = DB.session;
+  DB = seed(); DB.session = liveSession; DB._lastModified = Date.now();
+  save(); setTimeout(() => Sync.push(true), 500);
+  showSuccess(); toast('Cleared'); closeSheet(); refreshCurrentScreen();
+}
+
+function bundleCostPerPiece (b) { return (b.ops || []).reduce((a,o) => a + (Number(o.rate) || 0), 0); }
+function entryCost (p) { return Number(p.amount) || 0; }
+function entryRevenue (p) {
+  const b = DB.bundles.find(x => x.id === p.bundleId);
+  if (!b || !b.sellingPrice) return 0;
+  const tc = bundleCostPerPiece(b);
+  if (!tc) return 0;
+  return (Number(p.qty) || 0) * b.sellingPrice * ((Number(p.rate) || 0) / tc);
+}
+
+const filterState = {
+  dateType: 'preset', preset: 'today', from: '', to: '',
+  operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all',
+};
+function resolveDateRange () {
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (filterState.dateType === 'custom') {
+    let f = filterState.from || isoLocal(today);
+    let t = filterState.to   || isoLocal(today);
+    if (f > t) [f, t] = [t, f];
+    return { from: f, to: t };
   }
-}
-
-/* Full-database Excel workbook for Settings / backup */
-function buildFullWorkbook () {
-  const sheets = {};
-
-  sheets['Employees'] = [['ID', 'Name', 'Line', 'Skill', 'Status', 'Joined'],
-    ...DB.employees.map(e => [e.id, e.name, e.line, e.skill, e.status, e.joined || ''])];
-
-  sheets['Company Staff'] = [['ID', 'Name', 'Role', 'Salary', 'Hours/Day', 'Days/Month', 'Hourly Rate'],
-    ...DB.companyStaff.map(s => [s.id, s.name, s.role || '', s.salary, s.hoursPerDay, s.daysPerMonth, Number(staffHourlyRate(s).toFixed(2))])];
-
-  sheets['Master Operations'] = [['ID', 'Name', 'Description', 'Rate'],
-    ...DB.masterOps.map(o => [o.id, o.name, o.desc || '', Number(o.rate) || 0])];
-
-  sheets['Bundles'] = [['ID', 'Name', 'Style', 'Selling Price', 'Cost/pc', 'Operations'],
-    ...DB.bundles.map(b => [b.id, b.name, b.style || '', Number(b.sellingPrice) || 0, bundleCostPerPiece(b),
-      b.ops.map(o => `${o.name} (₹${o.rate})`).join(' + ')])];
-
-  sheets['Production'] = [['Date', 'Operator', 'Emp ID', 'Line', 'Bundle', 'Operation', 'Rate', 'Qty', 'Reject', 'Reason', 'Amount', 'Notes', 'TS'],
-    ...DB.production.map(r => [r.date, r.operatorName || '', r.empId || '', r.line || '', r.bundleName || '', r.operation || '',
-      Number(r.rate) || 0, r.qty, r.reject || 0, r.rejectReason || '', Math.round(r.amount || 0), r.notes || '', r.ts || ''])];
-
-  sheets['Expenses'] = [['Date', 'Category', 'Amount', 'Note', 'Auto', 'TS'],
-    ...DB.expenses.map(e => [e.date, e.category, Math.round(e.amount || 0), e.note || '', e.auto ? 'Yes' : '', e.ts || ''])];
-
-  sheets['Advances'] = [['Date', 'Type', 'Person ID', 'Person Name', 'Amount', 'Note', 'Settled', 'TS'],
-    ...DB.advances.map(a => [a.date, a.personType, a.personId, a.personName, Math.round(a.amount), a.note || '', a.settled ? 'Yes' : 'No', a.ts || ''])];
-
-  sheets['Staff Hours'] = [['Date', 'Staff ID', 'Staff Name', 'Hours', 'Hourly Rate', 'Amount', 'Note'],
-    ...DB.staffHours.map(h => [h.date, h.staffId, h.staffName, h.hours, Number((h.hourlyRate || 0).toFixed(2)), Math.round(h.amount || 0), h.note || ''])];
-
-  sheets['Recurring'] = [['Category', 'Amount', 'Frequency', 'Start', 'End', 'Active', 'Note'],
-    ...DB.recurring.map(r => [r.category, Number(r.amount), r.frequency, r.startDate, r.endDate || '', r.active ? 'Yes' : 'No', r.note || ''])];
-
-  return workbookFromSheets(sheets, {
-    range: 'All time · full database',
-    rows: DB.production.length + DB.expenses.length + DB.advances.length + DB.staffHours.length,
-  });
-}
-
-async function exportFullExcel () {
-  try {
-    const wb = buildFullWorkbook();
-    const stamp = todayISO();
-    await deliverWorkbook(wb, `aadhithran-full-${stamp}.xlsx`);
-  } catch (e) {
-    toast('Excel export failed: ' + e.message, { success:false });
+  const p = filterState.preset;
+  if (p === 'today') return { from: isoLocal(today), to: isoLocal(today) };
+  if (p === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); return { from: isoLocal(d), to: isoLocal(d) }; }
+  if (p === '7d') { const d = new Date(today); d.setDate(d.getDate()-6); return { from: isoLocal(d), to: isoLocal(today) }; }
+  if (p === '30d') { const d = new Date(today); d.setDate(d.getDate()-29); return { from: isoLocal(d), to: isoLocal(today) }; }
+  if (p === 'month') return { from: isoLocal(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoLocal(today) };
+  if (p === 'last_month') {
+    const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
+    const e = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { from: isoLocal(s), to: isoLocal(e) };
   }
+  if (p === 'all') return { from: '1970-01-01', to: isoLocal(today) };
+  return { from: isoLocal(today), to: isoLocal(today) };
 }
-async function downloadFullExcel () {
-  try {
-    const wb = buildFullWorkbook();
-    const stamp = todayISO();
-    const filename = `aadhithran-full-${stamp}.xlsx`;
-    const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
-    showSuccess(); toast('Saved: ' + filename);
-  } catch (e) { toast('Excel export failed: ' + e.message, { success:false }); }
+function applyFilters (rows) {
+  const { from, to } = resolveDateRange();
+  let out = rows.filter(r => r.date >= from && r.date <= to);
+  if (filterState.operatorId !== 'all') out = out.filter(r => r.empId === filterState.operatorId);
+  if (filterState.line !== 'all') out = out.filter(r => r.line === filterState.line);
+  if (filterState.bundleId !== 'all') out = out.filter(r => r.bundleId === filterState.bundleId);
+  if (filterState.operation !== 'all') out = out.filter(r => r.operation === filterState.operation);
+  return out;
+}
+function applyExpenseFilters (rows) {
+  const { from, to } = resolveDateRange();
+  let out = rows.filter(r => r.date >= from && r.date <= to);
+  if (filterState.category !== 'all') out = out.filter(r => r.category === filterState.category);
+  return out;
+}
+function getFilteredStats () {
+  const rows = applyFilters(DB.production);
+  const expenses = applyExpenseFilters(DB.expenses);
+  const pieces = rows.reduce((a,b) => a + b.qty, 0);
+  const rejects = rows.reduce((a,b) => a + b.reject, 0);
+  const cost = rows.reduce((a,b) => a + entryCost(b), 0);
+  const expenseTotal = expenses.reduce((a,b) => a + (Number(b.amount) || 0), 0);
+  const revenue = rows.reduce((a,b) => a + entryRevenue(b), 0);
+  const net = revenue - cost - expenseTotal;
+  const margin = revenue > 0 ? (net / revenue) * 100 : 0;
+  return { rows, expenses, pieces, rejects, cost, expenseTotal, total: cost + expenseTotal, revenue, net, margin };
 }
 
 function toast (msg, opts = {}) {
@@ -1769,7 +1515,7 @@ function refreshCurrentScreen () {
 window.refreshCurrentScreen = refreshCurrentScreen;
 $$('.tab').forEach(t => t.addEventListener('click', () => nav(t.dataset.sc)));
 $('#navBack').addEventListener('click', () => { currentReport = null; nav('reports'); });
-$('#navShare').addEventListener('click', () => shareReportExcel());
+$('#navShare').addEventListener('click', () => shareReport());
 $('#fab').addEventListener('click', () => addEntry());
 $('#syncIndicator').addEventListener('click', openSettingsSheet);
 
@@ -1805,7 +1551,8 @@ function renderHome () {
   const heroSub = isAcc
     ? (s.margin >= 0 ? '▲' : '▼') + Math.abs(s.margin).toFixed(1) + '% margin'
     : 'Piece wages + expenses';
-  const outstandingAdv = DB.advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount)||0), 0);
+  const outstandingAdv = DB.advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount)||0), 0)
+    - (DB.advancePayments || []).reduce((s,p) => s + (Number(p.amount)||0), 0);
 
   $('#heroWrap').innerHTML = `
     <div class="hero stagger s1">
@@ -1833,7 +1580,7 @@ function renderHome () {
     if (isAcc) countUp($('#heroRev'), 0, s.revenue, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
     countUp($('#heroCost'), 0, s.cost, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
     countUp($('#heroExp'), 0, s.expenseTotal, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
-    if (!isAcc) { const el = $('#heroAdv'); if (el) countUp(el, 0, outstandingAdv, 900, n => '₹' + Math.round(n).toLocaleString('en-IN')); }
+    if (!isAcc) { const el = $('#heroAdv'); if (el) countUp(el, 0, Math.max(0, outstandingAdv), 900, n => '₹' + Math.round(n).toLocaleString('en-IN')); }
   }, 60);
 
   const kpis = isAcc ? [
@@ -1845,7 +1592,7 @@ function renderHome () {
     { cls:'blue', ic:'i-bundle', l:'Output', v:s.pieces, u:'pcs', sub:`${new Set(s.rows.map(x=>x.empId)).size} operators`, f:n => Math.round(n).toLocaleString('en-IN') },
     { cls:'teal', ic:'i-money', l:'Piece Wages', v:s.cost, sub:'Paid to operators', f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
     { cls:'orange', ic:'i-wallet', l:'Expenses', v:s.expenseTotal, sub:`${s.expenses.length} entr${s.expenses.length===1?'y':'ies'}`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
-    { cls:'red', ic:'i-hand', l:'Advance Out', v:outstandingAdv, sub:`${DB.advances.filter(a => !a.settled).length} unsettled`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
+    { cls:'red', ic:'i-hand', l:'Advance Out', v:Math.max(0, outstandingAdv), sub:`${DB.advances.filter(a => !a.settled).length} unsettled`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
   ];
   $('#kpis').innerHTML = kpis.map((k, i) => `
     <div class="kpi-card ${k.cls} stagger s${i+2}">
@@ -1860,12 +1607,12 @@ function renderHome () {
   const q = [
     { i:'i-work', l:'Log Work', g:'emerald', fn:'addEntry' },
     { i:'i-hand', l:'Advance', g:'red', fn:'openAddAdvance' },
+    { i:'i-money', l:'Tally Pay', g:'gold', fn:'openAdvancePaymentSheet' },
     { i:'i-expense', l:'Expense', g:'orange', fn:'openAddExpense' },
-    { i:'i-bundle', l:'Bundles', g:'blue', sc:'bundles' },
     { i:'i-grid', l:'Monthly', g:'purple', fn:'openReportMonthly' },
-    { i:'i-clock', l:'Staff Hrs', g:'teal', fn:'openStaffHoursSheet' },
+    { i:'i-clock', l:'Attendance', g:'teal', fn:'openStaffHoursSheet' },
     { i:'i-repeat', l:'Recurring', g:'gray', fn:'openRecurringSheet' },
-    { i:'i-excel', l:'Excel', g:'gold', fn:'exportFullExcel' },
+    { i:'i-database', l:'Backup', g:'blue', fn:'openSettingsSheet' },
   ];
   $('#quick').innerHTML = q.map((x, i) => {
     const onclick = x.fn ? `onclick="${x.fn}()"` : (x.sc ? `onclick="nav('${x.sc}')"` : '');
@@ -1971,8 +1718,8 @@ function renderReports () {
     { id:'monthly',  t:'Monthly Grid', s:'Day-by-day · every person', ic:'i-grid', g:'purple', c:'#7C3AED' },
     { id:'weekly',   t:'Weekly Grid',  s:'Mon–Sun breakdown per person', ic:'i-cal', g:'blue', c:'#2563EB' },
     { id:'salary',   t:'Salary Sheet', s:'Per-person wage with op detail', ic:'i-money', g:'emerald', c:'#10B981' },
-    { id:'advance',  t:'Advance Ledger', s:'Salary advances per person', ic:'i-hand', g:'red', c:'#DC2626' },
-    { id:'staffhours', t:'Staff Hours', s:'Company staff hours & pay', ic:'i-clock', g:'teal', c:'#0F766E' },
+    { id:'advance',  t:'Advance Ledger', s:'Advances · tally payments · balance', ic:'i-hand', g:'red', c:'#DC2626' },
+    { id:'staffhours', t:'Staff Attendance', s:'Company staff hours & pay', ic:'i-clock', g:'teal', c:'#0F766E' },
     { id:'expense',  t:'Expenses', s:'By category + transactions', ic:'i-expense', g:'orange', c:'#EA580C' },
     { id:'recurring', t:'Recurring', s:'Daily / weekly / monthly templates', ic:'i-repeat', g:'pink', c:'#DB2777' },
     { id:'daily',    t:'Daily Production', s:'Production summary by date', ic:'i-briefcase', g:'cyan', c:'#0891B2' },
@@ -2066,7 +1813,10 @@ function openOperatorForm (emp) {
       <div class="ab-row"><span class="ab-l">Outstanding Advance</span><span class="ab-v">${money(advOut)}</span></div>
       <div class="ab-row"><span class="ab-l">All-time Advances</span><span class="ab-v sm">${money(DB.advances.filter(a => a.personType === 'operator' && a.personId === emp.id).reduce((s,a) => s + a.amount, 0))}</span></div>
     </div>
-    <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('operator','${emp.id}')" style="width:100%;margin-bottom:14px">${icon('i-plus')} Record Advance</button>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('operator','${emp.id}')" style="flex:1">${icon('i-plus')} Advance</button>
+      <button type="button" class="btn emerald sm" onclick="event.preventDefault();openAdvancePaymentSheet('operator','${emp.id}')" style="flex:1">${icon('i-money')} Tally Pay</button>
+    </div>
   ` : '';
   const html = `
     ${advBlock}
@@ -2562,7 +2312,7 @@ function openCompanyStaffForm (s) {
   const e = s || { id:'', name:'', role:'', salary:0, hoursPerDay:8, daysPerMonth:26 };
   const today = todayISO();
   const rate = staffHourlyRate(e);
-  const todayRec = s ? staffHoursToday(s.id) : null;
+  const todayRec = s ? staffHoursOn(s.id, today) : null;
   const todayHoursVal = todayRec ? todayRec.hours : '';
   const advOut = s ? advanceOutstanding('staff', s.id) : 0;
   const advBlock = s ? `
@@ -2570,9 +2320,12 @@ function openCompanyStaffForm (s) {
       <div class="ab-row"><span class="ab-l">Outstanding Advance</span><span class="ab-v">${money(advOut)}</span></div>
       <div class="ab-row"><span class="ab-l">All-time Advances</span><span class="ab-v sm">${money(DB.advances.filter(a => a.personType === 'staff' && a.personId === s.id).reduce((x,a) => x + a.amount, 0))}</span></div>
     </div>
-    <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('staff','${s.id}')" style="width:100%;margin-bottom:14px">${icon('i-plus')} Record Advance</button>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('staff','${s.id}')" style="flex:1">${icon('i-plus')} Advance</button>
+      <button type="button" class="btn emerald sm" onclick="event.preventDefault();openAdvancePaymentSheet('staff','${s.id}')" style="flex:1">${icon('i-money')} Tally Pay</button>
+    </div>
   ` : '';
-  const recent = s ? [...DB.staffHours.filter(h => h.staffId === s.id)].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 7) : [];
+  const recent = s ? [...DB.staffHours.filter(h => h.staffId === s.id)].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10) : [];
   const hoursListHtml = recent.length ? `
     <div class="hours-list" id="staffHoursList">
       ${recent.map(h => `
@@ -2600,10 +2353,16 @@ function openCompanyStaffForm (s) {
       <div class="hb-row"><span class="hb-l">Monthly Target</span><span class="hb-v sm" id="hbMonthly">${(Number(e.hoursPerDay)||8) * (Number(e.daysPerMonth)||26)} hrs · ${money(e.salary || 0)}</span></div>
     </div>
     ${isEdit ? `
-      <div class="field"><label>Log Hours · ${dateDisplay(today)}</label><input id="csTodayHours" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${todayHoursVal}">
-      <div class="hint">Auto-creates a Salary expense. Set 0 to remove.</div></div>
-      <div class="field"><label>Notes for today</label><input id="csTodayNote" placeholder="Optional" value="${todayRec ? escapeHtml(todayRec.note || '') : ''}"></div>
-      ${recent.length ? `<div class="field"><label>Last 7 Days</label>${hoursListHtml}</div>` : ''}
+      <div class="field"><label>Attendance Date</label>
+        <input id="csHoursDate" type="date" value="${today}">
+        <div class="hint">Pick any date to log or correct attendance.</div>
+      </div>
+      <div class="field"><label>Hours Worked</label>
+        <input id="csTodayHours" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${todayHoursVal}">
+        <div class="hint">Auto-creates a Salary expense. Leave blank to remove.</div>
+      </div>
+      <div class="field"><label>Note</label><input id="csTodayNote" placeholder="Optional" value="${todayRec ? escapeHtml(todayRec.note || '') : ''}"></div>
+      ${recent.length ? `<div class="field"><label>Recent Attendance</label>${hoursListHtml}</div>` : ''}
     ` : ''}
     ${isEdit ? `<button class="btn red" id="csDelete" style="margin-top:14px">${icon('i-trash')} Delete Staff</button>` : ''}
   `;
@@ -2615,9 +2374,18 @@ function openCompanyStaffForm (s) {
     if (!name) { toast('Name is required', {success:false}); return false; }
     if (hpd <= 0 || dpm <= 0) { toast('Hours and days must be positive', {success:false}); return false; }
     if (isEdit) {
-      DB.companyStaff[DB.companyStaff.findIndex(x => x.id === s.id)] = { ...DB.companyStaff.find(x => x.id === s.id), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm };
-      const todayH = $('#csTodayHours') ? ($('#csTodayHours').value) : '';
-      if (todayH !== '' && todayH !== null) saveStaffHours(s.id, today, Number(todayH) || 0, ($('#csTodayNote') || {}).value || '');
+      DB.companyStaff[DB.companyStaff.findIndex(x => x.id === s.id)] = {
+        ...DB.companyStaff.find(x => x.id === s.id),
+        name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm,
+      };
+      const hDate = ($('#csHoursDate') || {}).value || today;
+      const hRaw  = $('#csTodayHours') ? String($('#csTodayHours').value).trim() : '';
+      const existingRec = DB.staffHours.find(h => h.staffId === s.id && h.date === hDate);
+      if (hRaw === '') {
+        if (existingRec) deleteStaffHours(existingRec.id);
+      } else {
+        saveStaffHours(s.id, hDate, Number(hRaw) || 0, ($('#csTodayNote') || {}).value || '');
+      }
     } else {
       DB.companyStaff.push({ id: uid('cs'), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm });
     }
@@ -2634,6 +2402,17 @@ function openCompanyStaffForm (s) {
       const el2 = $('#hbMonthly'); if (el2) el2.textContent = `${total} hrs · ${money(sal)}`;
     };
     ['#csSalary','#csHoursPerDay','#csDaysPerMonth'].forEach(sel => { const el = $(sel); if (el) el.addEventListener('input', updateRate); });
+
+    /* attendance date switcher */
+    const hd = $('#csHoursDate');
+    if (hd && isEdit) hd.addEventListener('change', () => {
+      const d = hd.value || today;
+      const rec = DB.staffHours.find(h => h.staffId === s.id && h.date === d);
+      const hi = $('#csTodayHours'); if (hi) hi.value = rec ? rec.hours : '';
+      const ni = $('#csTodayNote');  if (ni) ni.value = rec ? (rec.note || '') : '';
+      haptic('light');
+    });
+
     $$('#staffHoursList [data-del]').forEach(btn => btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
       if (!confirm('Delete this hours entry?')) return;
@@ -2649,27 +2428,61 @@ function openCompanyStaffForm (s) {
   }, 60);
 }
 
-function openStaffHoursSheet () {
+/* ══════════ STAFF ATTENDANCE — editable date ══════════ */
+function openStaffHoursSheet (initialDate) {
   if (!DB.companyStaff.length) { toast('No company staff yet', {success:false}); nav('team'); return; }
-  const today = todayISO();
-  const html = DB.companyStaff.map(s => {
+  let sheetDate = initialDate || todayISO();
+
+  const rowsHtml = (date) => DB.companyStaff.map(s => {
     const rate = staffHourlyRate(s);
-    const rec = staffHoursToday(s.id);
-    return `<div class="field" data-sid="${s.id}">
+    const rec = staffHoursOn(s.id, date);
+    return `<div class="field">
       <label>${escapeHtml(s.name)} · ${money2(rate)}/hr</label>
       <input class="sh-hours" data-sid="${s.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${rec ? rec.hours : ''}">
     </div>`;
   }).join('');
-  openSheet('Log Staff Hours · ' + dateDisplay(today), html, () => {
+
+  const html = `
+    <div class="field"><label>Attendance Date</label>
+      <input id="shDate" type="date" value="${sheetDate}">
+      <div class="hint">Change the date to log or correct attendance for any day.</div>
+    </div>
+    <div id="shRows">${rowsHtml(sheetDate)}</div>
+    <button type="button" class="btn gray sm" id="shFill" style="width:100%;margin-top:6px">${icon('i-clock')} Fill blank rows with 8h</button>
+  `;
+
+  openSheet('Staff Attendance', html, () => {
+    const date = ($('#shDate') || {}).value || todayISO();
     let count = 0;
     $$('.sh-hours').forEach(inp => {
-      const v = inp.value.trim(); if (v === '') return;
-      saveStaffHours(inp.dataset.sid, today, Number(v) || 0, ''); count++;
+      const v = String(inp.value).trim();
+      const sid = inp.dataset.sid;
+      const prev = DB.staffHours.find(h => h.staffId === sid && h.date === date);
+      if (v === '') { if (prev) { deleteStaffHours(prev.id); count++; } return; }
+      const h = Number(v) || 0;
+      if (prev && Number(prev.hours) === h) return;
+      saveStaffHours(sid, date, h, '');
+      count++;
     });
-    if (count > 0) { save(); showSuccess(); toast(count + ' saved'); }
-    else toast('Nothing to save');
+    if (count > 0) { save(); showSuccess(); toast(count + ' attendance row' + (count > 1 ? 's' : '') + ' saved'); }
+    else toast('No changes');
     refreshCurrentScreen(); return true;
   });
+
+  setTimeout(() => {
+    const dEl = $('#shDate');
+    if (dEl) dEl.addEventListener('change', () => {
+      const d = dEl.value || todayISO();
+      sheetDate = d;
+      $('#shRows').innerHTML = rowsHtml(d);
+      haptic('light');
+    });
+    const fEl = $('#shFill');
+    if (fEl) fEl.addEventListener('click', () => {
+      $$('.sh-hours').forEach(inp => { if (!String(inp.value).trim()) inp.value = '8'; });
+      haptic('light');
+    });
+  }, 60);
 }
 window.openStaffHoursSheet = openStaffHoursSheet;
 
@@ -2860,16 +2673,16 @@ function renderActiveFilters () {
 }
 
 let currentReport = null;
+const REPORT_TITLES = {
+  monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet', staffhours:'Staff Attendance',
+  expense:'Expense Report', recurring:'Recurring Expenses', daily:'Daily Production',
+  operator:'Operator Report', bundle:'Bundle Report', operation:'Operation Report',
+  pnl:'Profit & Loss', advance:'Advance Ledger',
+};
 function openReport (id) {
   if (id === 'pnl' && !isAccount()) { toast('Account access only', {success:false}); return; }
   currentReport = id;
-  const titles = {
-    monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet', staffhours:'Staff Hours',
-    expense:'Expense Report', recurring:'Recurring Expenses', daily:'Daily Production',
-    operator:'Operator Report', bundle:'Bundle Report', operation:'Operation Report',
-    pnl:'Profit & Loss', advance:'Advance Ledger',
-  };
-  nav('reportDetail', { title: titles[id] || 'Report' });
+  nav('reportDetail', { title: REPORT_TITLES[id] || 'Report' });
 }
 function openReportSalary () { openReport('salary'); }
 function openReportMonthly () { openReport('monthly'); }
@@ -2923,83 +2736,130 @@ function renderReportContent () {
   attachRipple();
 }
 
+/* ══════════ ADVANCE LEDGER — with payment tally ══════════ */
 function buildAdvanceLedger () {
   const { from, to } = resolveDateRange();
   const periodAdvances = DB.advances.filter(a => a.date >= from && a.date <= to);
-  const periodTotal = periodAdvances.reduce((s, a) => s + a.amount, 0);
-  const periodSettled = periodAdvances.filter(a => a.settled).reduce((s, a) => s + a.amount, 0);
-  const outstandingAllTime = DB.advances.filter(a => !a.settled).reduce((s, a) => s + a.amount, 0);
-  const outstandingCount = DB.advances.filter(a => !a.settled).length;
-  const byPerson = {};
-  DB.advances.forEach(a => {
-    const key = a.personType + ':' + a.personId;
-    if (!byPerson[key]) byPerson[key] = {
-      personType: a.personType, personId: a.personId, personName: a.personName,
-      entries: [], outstanding: 0, total: 0,
+  const periodPayments = (DB.advancePayments || []).filter(p => p.date >= from && p.date <= to);
+  const periodAdvTotal = periodAdvances.reduce((s,a) => s + (Number(a.amount)||0), 0);
+  const periodPayTotal = periodPayments.reduce((s,p) => s + (Number(p.amount)||0), 0);
+
+  const map = {};
+  const ensure = (t, id, name) => {
+    const key = t + ':' + id;
+    if (!map[key]) map[key] = {
+      personType: t, personId: id, personName: name || '—',
+      entries: [], payments: [], advanceTotal: 0, waivedTotal: 0, paidTotal: 0,
     };
-    byPerson[key].entries.push(a);
-    byPerson[key].total += a.amount;
-    if (!a.settled) byPerson[key].outstanding += a.amount;
+    return map[key];
+  };
+  DB.advances.forEach(a => {
+    const g = ensure(a.personType, a.personId, a.personName);
+    g.entries.push(a);
+    if (a.settled) g.waivedTotal += Number(a.amount) || 0;
+    else           g.advanceTotal += Number(a.amount) || 0;
   });
-  const list = Object.values(byPerson).sort((a,b) => {
-    if (a.outstanding !== b.outstanding) return b.outstanding - a.outstanding;
-    return b.total - a.total;
+  (DB.advancePayments || []).forEach(p => {
+    const g = ensure(p.personType, p.personId, p.personName);
+    g.payments.push(p);
+    g.paidTotal += Number(p.amount) || 0;
   });
-  const unsettledPeople = list.filter(p => p.outstanding > 0).length;
+
+  const list = Object.values(map).map(g => ({ ...g, outstanding: Math.max(0, g.advanceTotal - g.paidTotal) }));
+  list.sort((a,b) => (b.outstanding - a.outstanding) || (b.advanceTotal - a.advanceTotal));
+
+  const totalAdvanceAll = list.reduce((s,g) => s + g.advanceTotal, 0);
+  const totalPaidAll    = list.reduce((s,g) => s + g.paidTotal, 0);
+  const outstandingAll  = list.reduce((s,g) => s + g.outstanding, 0);
+  const duePeople       = list.filter(g => g.outstanding > 0).length;
+
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#DC2626,#EF4444)">
-      <div class="rh-l">Outstanding Advances</div>
-      <div class="rh-v">${money(outstandingAllTime)}</div>
-      <div class="rh-s">${unsettledPeople} ${unsettledPeople === 1 ? 'person owes' : 'people owe'} · ${outstandingCount} unsettled ${outstandingCount === 1 ? 'entry' : 'entries'}</div>
+      <div class="rh-l">Outstanding Balance</div>
+      <div class="rh-v">${money(outstandingAll)}</div>
+      <div class="rh-s">${duePeople} ${duePeople === 1 ? 'person owes' : 'people owe'} · ${list.length} in ledger</div>
       <div class="rh-row">
-        <div class="rh-stat"><div class="rl">Issued (period)</div><div class="rv">${money(periodTotal)}</div></div>
-        <div class="rh-stat"><div class="rl">Settled (period)</div><div class="rv">${money(periodSettled)}</div></div>
+        <div class="rh-stat"><div class="rl">Total Advance</div><div class="rv">${money(totalAdvanceAll)}</div></div>
+        <div class="rh-stat"><div class="rl">Total Tallied</div><div class="rv">${money(totalPaidAll)}</div></div>
       </div>
     </div>
-    <div style="padding:0 16px 10px"><button class="btn red lg" onclick="openAddAdvance()">${icon('i-plus')} Record Advance Payment</button></div>
-    ${list.length ? list.map(p => renderAdvancePersonCard(p, from, to)).join('') : emptyState('i-hand', 'No advances yet', 'Tap "Record Advance Payment" to start the ledger.')}
+    <div class="active-filter-strip" style="padding:0 16px 12px">
+      <span>📅 <b>${from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to)}</b></span>
+      <span>Issued <b>${money(periodAdvTotal)}</b></span>
+      <span>Paid <b>${money(periodPayTotal)}</b></span>
+    </div>
+    <div class="tally-actions">
+      <button class="btn red lg" onclick="openAddAdvance()">${icon('i-plus')} Advance</button>
+      <button class="btn emerald lg" onclick="openAdvancePaymentSheet()">${icon('i-money')} Tally Pay</button>
+    </div>
+    ${list.length ? list.map(g => renderAdvancePersonCard(g, from, to)).join('') : emptyState('i-hand', 'No advances yet', 'Tap "Advance" to start the ledger.')}
   `;
 }
-function renderAdvancePersonCard (p, from, to) {
-  const periodAmt = p.entries.filter(a => a.date >= from && a.date <= to).reduce((s, a) => s + a.amount, 0);
-  const typeLabel = p.personType === 'operator' ? 'Operator' : 'Company Staff';
-  const badge = p.outstanding > 0
-    ? `<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">OUTSTANDING</span>`
-    : `<span style="background:var(--emerald-lt);color:var(--emerald-dk);padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">CLEARED</span>`;
-  const sortedEntries = [...p.entries].sort((a,b) => b.date.localeCompare(a.date));
+
+function renderAdvancePersonCard (g, from, to) {
+  const typeLabel = g.personType === 'operator' ? 'Operator' : 'Company Staff';
+  const periodAdv = g.entries.filter(a => a.date >= from && a.date <= to).reduce((s,a) => s + (Number(a.amount)||0), 0);
+  const periodPay = g.payments.filter(p => p.date >= from && p.date <= to).reduce((s,p) => s + (Number(p.amount)||0), 0);
+  const badge = g.outstanding > 0
+    ? `<span class="tally-badge due">DUE ${money(g.outstanding)}</span>`
+    : `<span class="tally-badge">CLEARED</span>`;
+  const entriesSorted  = [...g.entries].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+  const paymentsSorted = [...g.payments].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+
   return `
     <div class="salary-section">
       <div class="salary-emp" onclick="this.classList.toggle('expanded')">
         <div class="se-top">
-          <div class="se-av" style="background:linear-gradient(135deg,#DC2626,#EF4444)">${initials(p.personName)}</div>
+          <div class="se-av" style="background:linear-gradient(135deg,#DC2626,#EF4444)">${initials(g.personName)}</div>
           <div class="se-body">
-            <div class="se-name">${escapeHtml(p.personName)}</div>
-            <div class="se-info">${typeLabel} · ${p.entries.length} entr${p.entries.length === 1 ? 'y' : 'ies'}${periodAmt > 0 ? ' · ' + money(periodAmt) + ' in period' : ''}</div>
+            <div class="se-name">${escapeHtml(g.personName)}</div>
+            <div class="se-info">${typeLabel} · ${money(g.advanceTotal)} adv · ${money(g.paidTotal)} paid${(periodAdv || periodPay) ? ' · ' + money(periodAdv - periodPay) + ' net in period' : ''}</div>
           </div>
           <div class="se-amt">
-            <div class="se-net" style="color:${p.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(p.outstanding)}</div>
+            <div class="se-net" style="color:${g.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(g.outstanding)}</div>
             <div class="se-gross">${badge}</div>
           </div>
           <svg class="se-arrow"><use href="#i-chev-down"/></svg>
         </div>
         <div class="se-ops">
-          ${sortedEntries.map(a => `
-            <div class="op-line" style="align-items:center">
-              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dateShort(a.date)}${a.note ? ' · ' + escapeHtml(a.note) : ''}</span>
-              <span style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-                <b style="color:${a.settled ? 'var(--emerald-dk)' : 'var(--red)'}">${money(a.amount)}</b>
-                <button type="button" class="adv-set-chip ${a.settled ? 'on' : 'out'}" onclick="event.stopPropagation();toggleAdvanceSettled('${a.id}')">${a.settled ? '✓ SETTLED' : 'OUTSTANDING'}</button>
+          <div class="tally-sec-hd" style="border-top:none;margin-top:0;padding-top:2px">
+            <span>Advances Given</span><span>${money(g.advanceTotal)}</span>
+          </div>
+          ${entriesSorted.length ? entriesSorted.map(a => `
+            <div class="tally-row">
+              <span class="tl">${dateShort(a.date)}${a.note ? ' · ' + escapeHtml(a.note) : ''}</span>
+              <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                <b class="tv" style="color:${a.settled ? 'var(--text-3)' : 'var(--red)'};${a.settled ? 'text-decoration:line-through' : ''}">${money(a.amount)}</b>
+                <button type="button" class="adv-set-chip ${a.settled ? 'out' : 'on'}" onclick="event.stopPropagation();toggleAdvanceSettled('${a.id}')">${a.settled ? 'WAIVED' : 'IN TALLY'}</button>
                 <button type="button" onclick="event.stopPropagation();deleteAdvance('${a.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(220,38,38,.1);color:var(--red);display:grid;place-items:center;font-size:14px;border:none;cursor:pointer">×</button>
               </span>
-            </div>
-          `).join('')}
-          <div class="op-line op-tot"><span>Total advances</span><span>${money(p.total)}</span></div>
+            </div>`).join('') : `<div class="tally-row"><span class="tl" style="color:var(--text-3)">No advances</span><span></span></div>`}
+
+          <div class="tally-sec-hd">
+            <span>Payments Tallied</span><span style="color:var(--emerald-dk)">${money(g.paidTotal)}</span>
+          </div>
+          ${paymentsSorted.length ? paymentsSorted.map(p => `
+            <div class="tally-row">
+              <span class="tl">${dateShort(p.date)}${p.note ? ' · ' + escapeHtml(p.note) : ''}</span>
+              <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                <b class="tv" style="color:var(--emerald-dk)">${money(p.amount)}</b>
+                <button type="button" onclick="event.stopPropagation();deleteAdvancePayment('${p.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(220,38,38,.1);color:var(--red);display:grid;place-items:center;font-size:14px;border:none;cursor:pointer">×</button>
+              </span>
+            </div>`).join('') : `<div class="tally-row"><span class="tl" style="color:var(--text-3)">No payments recorded</span><span></span></div>`}
+
+          <div class="op-line op-tot" style="display:flex;justify-content:space-between;margin-top:8px">
+            <span>Advance ${money(g.advanceTotal)} − Paid ${money(g.paidTotal)}</span>
+            <span style="color:${g.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(g.outstanding)}</span>
+          </div>
+          ${g.waivedTotal > 0 ? `<div class="op-line" style="color:var(--text-3);font-size:11px"><span>Waived (excluded)</span><span>${money(g.waivedTotal)}</span></div>` : ''}
+          <button type="button" class="btn emerald sm" style="width:100%;margin-top:10px" onclick="event.stopPropagation();openAdvancePaymentSheet('${g.personType}','${g.personId}')">${icon('i-money')} Tally Payment</button>
         </div>
       </div>
     </div>
   `;
 }
 
+/* ══════════ MONTHLY GRID — with per-person operation details ══════════ */
 function buildMonthlyGrid () {
   const month = monthlyState.month || todayISO().slice(0,7);
   const [y, m] = month.split('-').map(Number);
@@ -3008,12 +2868,13 @@ function buildMonthlyGrid () {
     const d = new Date(y, m-1, i+1);
     return { day: i+1, date: isoLocal(d), dow: d.getDay() };
   });
-  const prodByEmp = {}, piecesByEmp = {};
+  const prodByEmp = {}, piecesByEmp = {}, rejectsByEmp = {};
   DB.production.forEach(p => {
     if (p.date.slice(0,7) !== month) return;
     if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {};
     prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0);
-    piecesByEmp[p.empId] = (piecesByEmp[p.empId] || 0) + p.qty;
+    piecesByEmp[p.empId]  = (piecesByEmp[p.empId]  || 0) + p.qty;
+    rejectsByEmp[p.empId] = (rejectsByEmp[p.empId] || 0) + (p.reject || 0);
   });
   const staffByRow = {};
   DB.staffHours.forEach(h => {
@@ -3054,6 +2915,82 @@ function buildMonthlyGrid () {
   if (!operatorRows && !staffRows) {
     return emptyState('i-grid', 'No data for ' + month, 'No production or hours logged this month.');
   }
+
+  /* ── per-person operation detail cards ── */
+  const opDetails = DB.employees.map(emp => {
+    const rows = DB.production.filter(p => p.empId === emp.id && p.date.slice(0,7) === month);
+    if (!rows.length) return '';
+    const ops = {};
+    rows.forEach(r => {
+      const k = r.operation || '—';
+      if (!ops[k]) ops[k] = { qty:0, wages:0, rejects:0, days:new Set() };
+      ops[k].qty     += r.qty;
+      ops[k].wages   += Number(r.amount) || 0;
+      ops[k].rejects += r.reject || 0;
+      ops[k].days.add(r.date);
+    });
+    const pieces  = rows.reduce((a,r) => a + r.qty, 0);
+    const wages   = rows.reduce((a,r) => a + (Number(r.amount)||0), 0);
+    const rejects = rows.reduce((a,r) => a + (r.reject||0), 0);
+    const opEntries = Object.entries(ops).sort((a,b) => b[1].qty - a[1].qty);
+    return `<div class="salary-section">
+      <div class="salary-emp" onclick="this.classList.toggle('expanded')">
+        <div class="se-top">
+          <div class="se-av">${initials(emp.name)}</div>
+          <div class="se-body">
+            <div class="se-name">${escapeHtml(emp.name)}</div>
+            <div class="se-info">${escapeHtml(emp.id)} · ${pieces} pcs · ${rejects} rejects · ${opEntries.length} operation${opEntries.length>1?'s':''}</div>
+          </div>
+          <div class="se-amt">
+            <div class="se-net">${money(wages)}</div>
+            <div class="se-gross">₹${pieces ? (wages/pieces).toFixed(2) : '0'}/pc avg</div>
+          </div>
+          <svg class="se-arrow"><use href="#i-chev-down"/></svg>
+        </div>
+        <div class="se-ops">
+          ${opEntries.map(([name, d]) => `
+            <div class="op-line">
+              <span>${escapeHtml(name)} · ${d.qty} pcs${d.rejects ? ' · ' + d.rejects + ' rej' : ''} · ${d.days.size}d</span>
+              <span>${money(d.wages)}</span>
+            </div>`).join('')}
+          <div class="op-line op-tot"><span>Total wages</span><span>${money(wages)}</span></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const staffDetails = DB.companyStaff.map(s => {
+    const hs = DB.staffHours.filter(h => h.staffId === s.id && h.date.slice(0,7) === month);
+    if (!hs.length) return '';
+    const totalH = hs.reduce((a,h) => a + (Number(h.hours)||0), 0);
+    const totalA = hs.reduce((a,h) => a + (Number(h.amount)||0), 0);
+    const rate   = staffHourlyRate(s);
+    return `<div class="salary-section">
+      <div class="salary-emp" onclick="this.classList.toggle('expanded')">
+        <div class="se-top">
+          <div class="se-av" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">${initials(s.name)}</div>
+          <div class="se-body">
+            <div class="se-name">${escapeHtml(s.name)}</div>
+            <div class="se-info">${escapeHtml(s.role || 'Staff')} · ${totalH.toFixed(1)} hrs · ${hs.length} day${hs.length>1?'s':''}</div>
+          </div>
+          <div class="se-amt">
+            <div class="se-net">${money(totalA)}</div>
+            <div class="se-gross">${money2(rate)}/hr</div>
+          </div>
+          <svg class="se-arrow"><use href="#i-chev-down"/></svg>
+        </div>
+        <div class="se-ops">
+          ${[...hs].sort((a,b) => a.date.localeCompare(b.date)).map(h => `
+            <div class="op-line">
+              <span>${dateShort(h.date)} · ${h.hours}h${h.note ? ' · ' + escapeHtml(h.note) : ''}</span>
+              <span>${money(h.amount)}</span>
+            </div>`).join('')}
+          <div class="op-line op-tot"><span>Total pay</span><span>${money(totalA)}</span></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">
       <div class="rh-l">Monthly Total · ${month}</div>
@@ -3071,6 +3008,8 @@ function buildMonthlyGrid () {
         <tbody>${operatorRows}${staffRows}</tbody>
       </table>
     </div>
+    <div class="sec-hd" style="padding:16px 20px 6px">Individual Details <span class="sec-sub">tap to expand operations</span></div>
+    ${opDetails}${staffDetails}
   `;
 }
 
@@ -3084,11 +3023,16 @@ function buildWeeklyGrid () {
     return { date: isoLocal(d), dow: d.getDay(), label: d.toLocaleDateString('en-IN', { weekday:'short' }), day: d.getDate() };
   });
   const from = weekDays[0].date, to = weekDays[6].date;
-  const prodByEmp = {}, staffByRow = {};
+  const prodByEmp = {}, staffByRow = {}, opsByEmp = {};
   DB.production.forEach(p => {
     if (p.date < from || p.date > to) return;
     if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {};
     prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0);
+    if (!opsByEmp[p.empId]) opsByEmp[p.empId] = {};
+    const k = p.operation || '—';
+    if (!opsByEmp[p.empId][k]) opsByEmp[p.empId][k] = { qty:0, wages:0 };
+    opsByEmp[p.empId][k].qty   += p.qty;
+    opsByEmp[p.empId][k].wages += Number(p.amount) || 0;
   });
   DB.staffHours.forEach(h => {
     if (h.date < from || h.date > to) return;
@@ -3126,6 +3070,29 @@ function buildWeeklyGrid () {
   if (!opRows && !stRows) {
     return emptyState('i-cal', 'No data this week', dateDisplay(from) + ' → ' + dateDisplay(to));
   }
+
+  const opDetails = DB.employees.map(emp => {
+    const ops = opsByEmp[emp.id];
+    if (!ops) return '';
+    const entries = Object.entries(ops).sort((a,b) => b[1].qty - a[1].qty);
+    const wages = entries.reduce((a,[,d]) => a + d.wages, 0);
+    const pieces = entries.reduce((a,[,d]) => a + d.qty, 0);
+    return `<div class="salary-section">
+      <div class="salary-emp" onclick="this.classList.toggle('expanded')">
+        <div class="se-top">
+          <div class="se-av">${initials(emp.name)}</div>
+          <div class="se-body"><div class="se-name">${escapeHtml(emp.name)}</div><div class="se-info">${pieces} pcs · ${entries.length} operation${entries.length>1?'s':''}</div></div>
+          <div class="se-amt"><div class="se-net">${money(wages)}</div><div class="se-gross">this week</div></div>
+          <svg class="se-arrow"><use href="#i-chev-down"/></svg>
+        </div>
+        <div class="se-ops">
+          ${entries.map(([name, d]) => `<div class="op-line"><span>${escapeHtml(name)} · ${d.qty} pcs</span><span>${money(d.wages)}</span></div>`).join('')}
+          <div class="op-line op-tot"><span>Total wages</span><span>${money(wages)}</span></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#2563EB,#3B82F6)">
       <div class="rh-l">Week Total</div>
@@ -3142,6 +3109,8 @@ function buildWeeklyGrid () {
         <tbody>${opRows}${stRows}</tbody>
       </table>
     </div>
+    <div class="sec-hd" style="padding:16px 20px 6px">Individual Details <span class="sec-sub">tap to expand operations</span></div>
+    ${opDetails}
   `;
 }
 
@@ -3246,17 +3215,21 @@ function buildSalaryReport (rows, from, to) {
   const list = Object.values(byEmp).sort((a,b) => b.wages - a.wages);
   const total = list.reduce((a,b) => a + b.wages, 0);
   const totalPcs = list.reduce((a,b) => a + b.pieces, 0);
-  const totalAdvOutstanding = DB.advances.filter(a => !a.settled && a.personType === 'operator').reduce((s, a) => s + a.amount, 0);
+  const totalAdvOutstanding = DB.advances
+    .filter(a => !a.settled && a.personType === 'operator')
+    .reduce((s, a) => s + a.amount, 0)
+    - (DB.advancePayments || []).filter(p => p.personType === 'operator').reduce((s,p) => s + p.amount, 0);
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#059669,#10B981)">
       <div class="rh-l">Operator Wages</div>
       <div class="rh-v">${money(total)}</div>
       <div class="rh-s">${list.length} operator${list.length>1?'s':''} · ${totalPcs} pieces</div>
-      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(totalAdvOutstanding)}</div></div></div>` : ''}
+      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(Math.max(0, totalAdvOutstanding))}</div></div></div>` : ''}
     </div>
     ${list.map(emp => {
       const advOut = advanceOutstanding('operator', emp.id);
       const advInPeriod = advanceTotalInPeriod('operator', emp.id, from, to);
+      const paidInPeriod = advancePaidInPeriod('operator', emp.id, from, to);
       const netPayable = emp.wages - advInPeriod;
       return `
         <div class="salary-section">
@@ -3275,8 +3248,10 @@ function buildSalaryReport (rows, from, to) {
               }).join('')}
               <div class="op-line op-tot"><span>Total wages</span><span>${money(emp.wages)}</span></div>
               ${advInPeriod > 0 ? `<div class="op-line" style="color:#991B1B"><span>Advance this period</span><span>-${money(advInPeriod)}</span></div>` : ''}
+              ${paidInPeriod > 0 ? `<div class="op-line" style="color:var(--emerald-dk)"><span>Advance tallied this period</span><span>${money(paidInPeriod)}</span></div>` : ''}
               ${advOut > 0 ? `<div class="op-line" style="color:#991B1B"><span>Outstanding advance</span><span>${money(advOut)}</span></div>` : ''}
               <div class="op-line op-tot" style="color:var(--emerald-dk);border-top:2px solid var(--emerald-lt)"><span>Net payable</span><span>${money(netPayable)}</span></div>
+              <button type="button" class="btn emerald sm" style="width:100%;margin-top:10px" onclick="event.stopPropagation();openAdvancePaymentSheet('operator','${emp.id}')">${icon('i-money')} Tally Payment</button>
             </div>
           </div>
         </div>
@@ -3286,7 +3261,7 @@ function buildSalaryReport (rows, from, to) {
 }
 
 function buildStaffHoursReport (hours, from, to) {
-  if (!hours.length) return emptyState('i-clock', 'No staff hours', 'No staff hours logged in this range.');
+  if (!hours.length) return emptyState('i-clock', 'No attendance', 'No staff hours logged in this range.');
   const byStaff = {};
   hours.forEach(h => {
     if (!byStaff[h.staffId]) byStaff[h.staffId] = { id:h.staffId, name:h.staffName, hours:0, amount:0, hourlyRate:h.hourlyRate, days:[] };
@@ -3297,18 +3272,26 @@ function buildStaffHoursReport (hours, from, to) {
   const list = Object.values(byStaff).sort((a,b) => b.amount - a.amount);
   const totalHrs = list.reduce((a,b) => a + b.hours, 0);
   const totalAmt = list.reduce((a,b) => a + b.amount, 0);
-  const totalAdvOutstanding = DB.advances.filter(a => !a.settled && a.personType === 'staff').reduce((s, a) => s + a.amount, 0);
+  const totalAdvOutstanding = DB.advances
+    .filter(a => !a.settled && a.personType === 'staff')
+    .reduce((s, a) => s + a.amount, 0)
+    - (DB.advancePayments || []).filter(p => p.personType === 'staff').reduce((s,p) => s + p.amount, 0);
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#0F766E,#14B8A6)">
       <div class="rh-l">Total Staff Pay</div>
       <div class="rh-v">${money(totalAmt)}</div>
       <div class="rh-s">${list.length} staff · ${totalHrs.toFixed(1)} hours</div>
-      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(totalAdvOutstanding)}</div></div></div>` : ''}
+      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(Math.max(0, totalAdvOutstanding))}</div></div></div>` : ''}
+    </div>
+    <div class="tally-actions" style="padding-top:0">
+      <button class="btn primary lg" onclick="openStaffHoursSheet()">${icon('i-clock')} Log Attendance</button>
+      <button class="btn emerald lg" onclick="openAdvancePaymentSheet('staff')">${icon('i-money')} Tally Pay</button>
     </div>
     ${list.map(emp => {
       const staffId = emp.id;
       const advOut = staffId ? advanceOutstanding('staff', staffId) : 0;
       const advInPeriod = staffId ? advanceTotalInPeriod('staff', staffId, from, to) : 0;
+      const paidInPeriod = staffId ? advancePaidInPeriod('staff', staffId, from, to) : 0;
       const netPayable = emp.amount - advInPeriod;
       return `
         <div class="salary-section">
@@ -3325,8 +3308,10 @@ function buildStaffHoursReport (hours, from, to) {
               `).join('')}
               <div class="op-line op-tot"><span>Total wages</span><span>${money(emp.amount)}</span></div>
               ${advInPeriod > 0 ? `<div class="op-line" style="color:#991B1B"><span>Advance this period</span><span>-${money(advInPeriod)}</span></div>` : ''}
+              ${paidInPeriod > 0 ? `<div class="op-line" style="color:var(--emerald-dk)"><span>Advance tallied this period</span><span>${money(paidInPeriod)}</span></div>` : ''}
               ${advOut > 0 ? `<div class="op-line" style="color:#991B1B"><span>Outstanding advance</span><span>${money(advOut)}</span></div>` : ''}
               <div class="op-line op-tot" style="color:var(--emerald-dk);border-top:2px solid var(--emerald-lt)"><span>Net payable</span><span>${money(netPayable)}</span></div>
+              <button type="button" class="btn emerald sm" style="width:100%;margin-top:10px" onclick="event.stopPropagation();openAdvancePaymentSheet('staff','${emp.id}')">${icon('i-money')} Tally Payment</button>
             </div>
           </div>
         </div>
@@ -3529,6 +3514,125 @@ function emptyState (iconId, title, text) {
   return `<div class="empty"><div class="eic">${icon(iconId)}</div><h4>${escapeHtml(title)}</h4><p>${escapeHtml(text)}</p><p style="font-size:12px;color:var(--text-3);margin-top:6px">Try widening the date range with the chips above.</p></div>`;
 }
 
+function shareReport () { toast('Use PDF button or screenshot'); }
+
+/* ══════════ PDF EXPORT (A4) — works for every report incl. advance ledger ══════════ */
+function exportReportPdf () {
+  if (!currentReport) { toast('Open a report first', {success:false}); return; }
+  const title = REPORT_TITLES[currentReport] || 'Report';
+
+  let rangeLabel = '';
+  if (currentReport === 'monthly') {
+    const [y, m] = (monthlyState.month || todayISO().slice(0,7)).split('-').map(Number);
+    rangeLabel = new Date(y, m-1, 1).toLocaleDateString('en-IN', { month:'long', year:'numeric' });
+  } else if (currentReport === 'weekly') {
+    const anchor = new Date((monthlyState.week || todayISO()) + 'T00:00:00');
+    const dow = anchor.getDay();
+    const monOff = dow === 0 ? -6 : 1 - dow;
+    const mon = new Date(anchor); mon.setDate(anchor.getDate() + monOff);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    rangeLabel = dateDisplay(isoLocal(mon)) + ' → ' + dateDisplay(isoLocal(sun));
+  } else if (currentReport === 'recurring') {
+    rangeLabel = 'All recurring templates';
+  } else {
+    const { from, to } = resolveDateRange();
+    rangeLabel = from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to);
+  }
+
+  const bodyHtml = $('#reportContent').innerHTML;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Allow pop-ups to export PDF', {success:false}); return; }
+
+  const css = `
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @page{size:A4;margin:12mm}
+    body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;color:#0F172A;background:#fff;font-size:12px}
+    button{display:none !important}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0F766E;padding-bottom:10px;margin-bottom:16px}
+    .hdr .co{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#0F766E;font-weight:800}
+    .hdr h1{font-size:20px;margin:5px 0 0;font-weight:800;letter-spacing:-.02em}
+    .hdr .rng{font-size:11px;color:#475569;font-weight:600;text-align:right;line-height:1.55}
+    .report-hero{border-radius:12px;padding:14px 16px;color:#fff;margin-bottom:12px}
+    .rh-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.85}
+    .rh-v{font-size:24px;font-weight:800;margin-top:6px}
+    .rh-s{font-size:11px;opacity:.9;margin-top:5px}
+    .rh-row{display:flex;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}
+    .rh-stat .rl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
+    .rh-stat .rv{font-size:13px;font-weight:700;margin-top:3px}
+    .grid-scroll{overflow:visible;margin:0 0 14px;border:1px solid #E2E8F0;border-radius:10px}
+    .grid-table{border-collapse:collapse;width:100%;font-size:9.5px}
+    .grid-table th,.grid-table td{padding:4px 6px;text-align:center;border-bottom:1px solid #E2E8F0;border-right:1px solid #E2E8F0;white-space:nowrap}
+    .grid-table th{background:#0F766E;color:#fff;font-weight:700;font-size:9px}
+    .grid-table th:first-child,.grid-table td:first-child{text-align:left;font-weight:700;min-width:100px}
+    .grid-table td.has-val{background:#D1FAE5;color:#065F46;font-weight:700}
+    .grid-table td.zero{color:#94A3B8}
+    .grid-table .grid-total-col{background:#ECFDF5;color:#065F46;font-weight:800}
+    .grid-table td[style*="rgba(220,38,38"]{background:#FEE2E2 !important;color:#B91C1C !important}
+    .pnl-card{border-radius:12px;padding:12px 14px;margin-bottom:10px;color:#fff}
+    .pcl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.85}
+    .pcv{font-size:20px;font-weight:800;margin-top:5px}
+    .pcs{font-size:10.5px;opacity:.9;margin-top:3px}
+    .pnl-card.rev{background:#0891B2}.pnl-card.wage{background:#7C3AED}.pnl-card.exp{background:#EA580C}
+    .pnl-card.net{background:#059669}.pnl-card.net.neg{background:#DC2626}
+    .salary-section{border:1px solid #E2E8F0;border-radius:12px;margin-bottom:10px;overflow:hidden;page-break-inside:avoid}
+    .salary-emp{padding:10px 12px}
+    .se-top{display:flex;align-items:center;gap:10px}
+    .se-av{width:34px;height:34px;border-radius:10px;background:#0F766E;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0}
+    .se-body{flex:1;min-width:0}
+    .se-name{font-size:13px;font-weight:700}
+    .se-info{font-size:10.5px;color:#64748B;margin-top:2px}
+    .se-amt{text-align:right}
+    .se-net{font-size:13px;font-weight:800;color:#059669}
+    .se-gross{font-size:10px;color:#64748B;margin-top:2px}
+    .se-ops{margin-top:8px;padding:8px 10px;background:#F8FAFC;border-radius:8px;display:block !important}
+    .op-line{display:flex;justify-content:space-between;padding:3px 0;font-size:11px;gap:10px}
+    .op-line span:first-child{color:#475569}
+    .op-line span:last-child{font-weight:700}
+    .op-tot{border-top:1px dashed #CBD5E1;margin-top:5px;padding-top:5px;font-weight:700}
+    .se-arrow{display:none}
+    .tally-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;font-size:11px}
+    .tally-row .tl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475569}
+    .tally-row .tv{font-weight:700}
+    .tally-sec-hd{font-size:10px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px;border-top:1px dashed #CBD5E1;margin-top:6px;display:flex;justify-content:space-between}
+    .tally-sec-hd:first-child{border-top:none;margin-top:0}
+    .tally-badge{background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:100px;font-size:9px;font-weight:800}
+    .tally-badge.due{background:#FEE2E2;color:#991B1B}
+    .expense-list-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #E2E8F0}
+    .expense-list-item .eli-ic{width:30px;height:30px;border-radius:9px;background:#EA580C;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .expense-list-item .eli-ic svg{width:14px;height:14px}
+    .eli-body{flex:1;min-width:0}
+    .eli-t{font-size:12px;font-weight:700}
+    .eli-s{font-size:10px;color:#64748B;margin-top:1px}
+    .eli-amt{font-size:13px;font-weight:800;color:#EA580C}
+    .sec-hd{font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.07em;padding:12px 0 6px}
+    .empty{text-align:center;padding:30px 20px;color:#64748B}
+    .empty h4{font-size:14px;color:#0F172A;margin-bottom:4px}
+    .empty .eic{display:none}
+    .hint{font-size:10.5px;color:#64748B;margin:0 0 8px}
+    .recur-chip{display:inline-block;padding:1px 6px;border-radius:100px;font-size:9px;font-weight:800;background:#CCFBF1;color:#0D5F58;text-transform:uppercase}
+    .recur-chip.off{background:#E9E9EB;color:#94A3B8}
+    .active-filter-strip{font-size:10.5px;color:#475569;padding:0 0 10px;display:flex;gap:8px;flex-wrap:wrap}
+    .report-table{border:1px solid #E2E8F0;border-radius:10px;overflow:hidden}
+  `;
+
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>${escapeHtml(title)} — Aadhithran Enterprises</title>
+    <style>${css}</style></head><body>
+    <div class="hdr">
+      <div>
+        <div class="co">Aadhithran Enterprises</div>
+        <h1>${escapeHtml(title)}</h1>
+      </div>
+      <div class="rng">${escapeHtml(rangeLabel)}<br>Generated ${new Date().toLocaleString('en-IN')}</div>
+    </div>
+    ${bodyHtml}
+    <scr` + `ipt>setTimeout(function(){window.print();},400);</scr` + `ipt>
+  </body></html>`);
+  w.document.close();
+}
+window.exportReportPdf = exportReportPdf;
+
 function openSettingsSheet () {
   const days = !META.lastBackup ? Infinity : Math.floor((Date.now() - META.lastBackup) / 86400000);
   const backupLabel = days === Infinity ? 'Never' : days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago';
@@ -3542,9 +3646,7 @@ function openSettingsSheet () {
       <div style="padding:14px;background:var(--surface-2);border-radius:12px">
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">State</span><b>${escapeHtml(statusLabel)}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last pull</span><b>${Sync.lastPull ? timeShort(Sync.lastPull) : '—'}</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Cloud payload</span><b>${META.cloudBytes ? fmtBytes(META.cloudBytes) + ' → ' + fmtBytes(META.cloudGz) : '—'}</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Shards / local size</span><b>${Sync.shardIds().length} · ${fmtBytes(localBytes())}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
       </div>
     </div>
     <div class="field">
@@ -3553,16 +3655,10 @@ function openSettingsSheet () {
       <button class="btn emerald" id="syncPushBtn">${icon('i-cloud-up')} Push</button>
     </div>
     <div class="field">
-      <label>Excel Export</label>
-      <button class="btn emerald" id="doExcelShareBtn" style="margin-bottom:8px">${icon('i-excel')} Share full workbook</button>
-      <button class="btn outline" id="doExcelDownloadBtn">${icon('i-download')} Download full workbook</button>
-      <div class="hint">All data as a multi-sheet .xlsx: employees, production, expenses, advances, staff hours, recurring templates.</div>
-    </div>
-    <div class="field">
-      <label>JSON Backup</label>
+      <label>Local Backup</label>
       <button class="btn gray" id="doBackupBtn" style="margin-bottom:8px">${icon('i-download')} Export backup file</button>
       <button class="btn outline" id="doRestoreBtn">${icon('i-upload')} Restore from backup</button>
-      <div class="hint">Last export: <b>${escapeHtml(backupLabel)}</b></div>
+      <div class="hint">Last file backup: <b>${escapeHtml(backupLabel)}</b></div>
     </div>
     ${pinSection}
     <div class="field">
@@ -3574,8 +3670,6 @@ function openSettingsSheet () {
   setTimeout(() => {
     $('#syncPullBtn').addEventListener('click', async () => { closeSheet(); await Sync.pull(false); });
     $('#syncPushBtn').addEventListener('click', async () => { closeSheet(); await Sync.push(true); });
-    $('#doExcelShareBtn').addEventListener('click', exportFullExcel);
-    $('#doExcelDownloadBtn').addEventListener('click', downloadFullExcel);
     $('#doBackupBtn').addEventListener('click', backupNow);
     $('#doRestoreBtn').addEventListener('click', pickRestoreFile);
     $('#doClearBtn').addEventListener('click', confirmClearAll);
@@ -3607,118 +3701,6 @@ function openPinChangeSheet (role) {
   });
 }
 
-function bundleCostPerPiece (b) { return (b.ops || []).reduce((a,o) => a + (Number(o.rate) || 0), 0); }
-function entryCost (p) { return Number(p.amount) || 0; }
-function entryRevenue (p) {
-  const b = DB.bundles.find(x => x.id === p.bundleId);
-  if (!b || !b.sellingPrice) return 0;
-  const tc = bundleCostPerPiece(b);
-  if (!tc) return 0;
-  return (Number(p.qty) || 0) * b.sellingPrice * ((Number(p.rate) || 0) / tc);
-}
-
-const filterState = {
-  dateType: 'preset', preset: 'today', from: '', to: '',
-  operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all',
-};
-function resolveDateRange () {
-  const today = new Date(); today.setHours(0,0,0,0);
-  if (filterState.dateType === 'custom') {
-    let f = filterState.from || isoLocal(today);
-    let t = filterState.to   || isoLocal(today);
-    if (f > t) [f, t] = [t, f];
-    return { from: f, to: t };
-  }
-  const p = filterState.preset;
-  if (p === 'today') return { from: isoLocal(today), to: isoLocal(today) };
-  if (p === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); return { from: isoLocal(d), to: isoLocal(d) }; }
-  if (p === '7d') { const d = new Date(today); d.setDate(d.getDate()-6); return { from: isoLocal(d), to: isoLocal(today) }; }
-  if (p === '30d') { const d = new Date(today); d.setDate(d.getDate()-29); return { from: isoLocal(d), to: isoLocal(today) }; }
-  if (p === 'month') return { from: isoLocal(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoLocal(today) };
-  if (p === 'last_month') {
-    const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
-    const e = new Date(today.getFullYear(), today.getMonth(), 0);
-    return { from: isoLocal(s), to: isoLocal(e) };
-  }
-  if (p === 'all') return { from: '1970-01-01', to: isoLocal(today) };
-  return { from: isoLocal(today), to: isoLocal(today) };
-}
-function applyFilters (rows) {
-  const { from, to } = resolveDateRange();
-  let out = rows.filter(r => r.date >= from && r.date <= to);
-  if (filterState.operatorId !== 'all') out = out.filter(r => r.empId === filterState.operatorId);
-  if (filterState.line !== 'all') out = out.filter(r => r.line === filterState.line);
-  if (filterState.bundleId !== 'all') out = out.filter(r => r.bundleId === filterState.bundleId);
-  if (filterState.operation !== 'all') out = out.filter(r => r.operation === filterState.operation);
-  return out;
-}
-function applyExpenseFilters (rows) {
-  const { from, to } = resolveDateRange();
-  let out = rows.filter(r => r.date >= from && r.date <= to);
-  if (filterState.category !== 'all') out = out.filter(r => r.category === filterState.category);
-  return out;
-}
-function getFilteredStats () {
-  const rows = applyFilters(DB.production);
-  const expenses = applyExpenseFilters(DB.expenses);
-  const pieces = rows.reduce((a,b) => a + b.qty, 0);
-  const rejects = rows.reduce((a,b) => a + b.reject, 0);
-  const cost = rows.reduce((a,b) => a + entryCost(b), 0);
-  const expenseTotal = expenses.reduce((a,b) => a + (Number(b.amount) || 0), 0);
-  const revenue = rows.reduce((a,b) => a + entryRevenue(b), 0);
-  const net = revenue - cost - expenseTotal;
-  const margin = revenue > 0 ? (net / revenue) * 100 : 0;
-  return { rows, expenses, pieces, rejects, cost, expenseTotal, total: cost + expenseTotal, revenue, net, margin };
-}
-
-async function backupNow () {
-  try {
-    const payload = { _app:'aadhithran-erp', _version:13, _exported:new Date().toISOString(), data: DB };
-    const json = JSON.stringify(payload, null, 2);
-    const stamp = new Date().toISOString().slice(0,10);
-    const filename = 'aadhithran-backup-' + stamp + '.json';
-    const blob = new Blob([json], { type:'application/json' });
-    const file = new File([blob], filename, { type:'application/json' });
-    if (navigator.canShare && navigator.canShare({ files:[file] })) {
-      try {
-        await navigator.share({ files:[file], title:'Aadhithran backup', text:'Backup ' + stamp });
-        META.lastBackup = Date.now(); persistMeta(); showSuccess(); toast('Backup shared'); return;
-      } catch (err) { if (err && err.name === 'AbortError') return; }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
-    META.lastBackup = Date.now(); persistMeta();
-    showSuccess(); toast('Backup saved');
-  } catch (e) { toast('Backup failed: ' + e.message, { success:false }); }
-}
-function pickRestoreFile () {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'application/json,.json';
-  input.onchange = async (e) => {
-    const file = e.target.files && e.target.files[0]; if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      const remote = parsed && parsed._app === 'aadhithran-erp' ? parsed.data : parsed;
-      if (!remote || !Array.isArray(remote.employees)) throw new Error('Not a valid backup');
-      if (!confirm('Restore this backup? This will replace local data and push to cloud.')) return;
-      const liveSession = DB.session;
-      DB = { ...remote, session: liveSession || null, _lastModified: Date.now() };
-      save(); showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
-    } catch (err) { toast('Restore failed: ' + err.message, { success:false }); }
-  };
-  input.click();
-}
-function confirmClearAll () {
-  if (!confirm('Delete ALL data on this device AND cloud bin?')) return;
-  if (prompt('Type DELETE to confirm:') !== 'DELETE') { toast('Cancelled'); return; }
-  const liveSession = DB.session;
-  DB = seed(); DB.session = liveSession; DB._lastModified = Date.now();
-  save(); setTimeout(() => Sync.push(true), 500);
-  showSuccess(); toast('Cleared'); closeSheet(); refreshCurrentScreen();
-}
-
 setLoginRole('admin');
 updatePinSlots();
 
@@ -3739,8 +3721,8 @@ $('#teamAddBtn').addEventListener('click', () => {
   else if (teamTab === 'operations') openNewMasterOp();
   else openNewCompanyStaff();
 });
-$('#shareExcelBtn').addEventListener('click', shareReportExcel);
-$('#downloadExcelBtn').addEventListener('click', downloadReportExcel);
+$('#shareBtn').addEventListener('click', shareReport);
+$('#exportPdfBtn').addEventListener('click', exportReportPdf);
 
 attachRipple();
 updateSyncIndicator();
