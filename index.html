@@ -1158,7 +1158,7 @@ const Sync = {
     }
   },
 
-   async bootstrap () {
+  async bootstrap () {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await this._ensureFirebase();
@@ -2911,7 +2911,6 @@ function openSettingsSheet () {
   
   openSheet('Settings', html, null);
   
-  // Live-update the real-time label while the sheet is open
   const intv = setInterval(() => {
     const el = $('#realtimeLabel');
     if (!el || !sheet.classList.contains('on')) { clearInterval(intv); return; }
@@ -2927,7 +2926,6 @@ function openSettingsSheet () {
     const ap = $('#changeAdminPin'); if (ap) ap.addEventListener('click', () => openPinChangeSheet('admin'));
     const cp = $('#changeAccountPin'); if (cp) cp.addEventListener('click', () => openPinChangeSheet('account'));
   }, 60);
-}
 }
 window.openSettingsSheet = openSettingsSheet;
 
