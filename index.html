@@ -442,19 +442,11 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 .adv-set-chip.out{background:#FEE2E2;color:#991B1B}
 .adv-set-chip.on{background:var(--emerald-lt);color:var(--emerald-dk)}
 
-.shard-row{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:500;padding:6px 0;border-bottom:1px solid var(--separator)}
-.shard-row:last-child{border-bottom:none}
-.shard-row .sr-l{color:var(--text-3)}
-.shard-row .sr-r{font-weight:700;font-variant-numeric:tabular-nums}
-.shard-bar{height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden;margin-top:4px}
-.shard-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,#0F766E,#14B8A6)}
-
 @keyframes rippleAnim{to{transform:scale(2.4);opacity:0}}
 @keyframes popIn{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
 @keyframes slideUpFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes iconBounce{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-3px) scale(1.12)}100%{transform:translateY(-2px) scale(1.06)}}
 @keyframes heroPulse{0%,100%{box-shadow:0 12px 30px -10px rgba(15,118,110,.55)}50%{box-shadow:0 16px 42px -8px rgba(15,118,110,.78)}}
-@keyframes sheetIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
 @keyframes fabPop{0%{transform:scale(0) rotate(-90deg)}70%{transform:scale(1.12) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
 
 @media print{
@@ -654,28 +646,33 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
-   AADHITHRAN ERP — v14  (Firebase Firestore sync)
+   AADHITHRAN ERP — v14 (Firebase Firestore backend · GitHub-Pages ready)
    ───────────────────────────────────────────────────────────────────
-   • Local-first:  localStorage is the source of truth for the UI.
-   • Cloud:        Firestore, one document per "shard" in `shards/*`.
-   • Auth:         Anonymous Firebase auth (silent, no UI change).
-   • Real-time:    onSnapshot keeps every open device in sync.
-   • Writes:       Only shards that changed are uploaded (dirty tracking).
+   • localStorage is the source of truth for the UI (offline-first).
+   • Cloud: Firestore, 5 documents at shards/{people|catalog|production|finance|config}.
+   • Auth:  Anonymous Firebase auth (silent, no UI change).
+   • Real-time: onSnapshot pushes changes to every open tab/device instantly.
+   • Writes: debounced (3 s), only dirty shards uploaded.
 
-   Firestore rules (Rules tab in Firebase console):
-     rules_version = '2';
-     service cloud.firestore {
-       match /databases/{db}/documents {
-         match /shards/{shard} {
-           allow read, write: if request.auth != null;
-         }
-       }
-     }
+   Firebase setup (one-time, in Firebase console → garment-erp-d92aa):
+     1. Authentication → Sign-in method → enable Anonymous
+     2. Firestore Database → Create database
+     3. Firestore → Rules:
+          rules_version = '2';
+          service cloud.firestore {
+            match /databases/{db}/documents {
+              match /shards/{shard} {
+                allow read, write: if request.auth != null;
+              }
+            }
+          }
+     4. Authentication → Settings → Authorized domains: add <user>.github.io
    ═══════════════════════════════════════════════════════════════════ */
 
 const LS = 'aadhithran_erp_v12';
 const META_LS = 'aadhithran_meta_v12';
 
+/* ─── Firebase credentials (public keys — safe to include) ─────── */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDly6HdphWPCHZUqYjYUzb9upO0mQmYmvI",
   authDomain: "garment-erp-d92aa.firebaseapp.com",
@@ -683,8 +680,11 @@ const FIREBASE_CONFIG = {
   storageBucket: "garment-erp-d92aa.firebasestorage.app",
   messagingSenderId: "11614712402",
   appId: "1:11614712402:web:7701944732b3d0e388e58b",
+  measurementId: "G-B6XE5KESWS"
 };
 
+const FIREBASE_SDK_VERSION = '10.12.2';
+const FIREBASE_CDN = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
 const PUSH_DEBOUNCE = 3000;
 
 const SHARD_DEFS = {
@@ -738,14 +738,8 @@ function staffHourlyRate (s) {
   if (!total) return 0;
   return (Number(s.salary) || 0) / total;
 }
-function staffHoursToday (staffId) {
-  const t = todayISO();
-  return DB.staffHours.find(h => h.staffId === staffId && h.date === t);
-}
-function staffMonthTotal (staffId, month) {
-  return DB.staffHours.filter(h => h.staffId === staffId && h.date.slice(0,7) === month)
-    .reduce((a,b) => a + (Number(b.amount) || 0), 0);
-}
+function staffHoursToday (staffId) { const t = todayISO(); return DB.staffHours.find(h => h.staffId === staffId && h.date === t); }
+function staffMonthTotal (staffId, month) { return DB.staffHours.filter(h => h.staffId === staffId && h.date.slice(0,7) === month).reduce((a,b) => a + (Number(b.amount) || 0), 0); }
 function saveStaffHours (staffId, date, hours, note) {
   const s = DB.companyStaff.find(x => x.id === staffId);
   if (!s) return null;
@@ -772,34 +766,24 @@ function deleteStaffHours (id) {
   DB.expenses = DB.expenses.filter(e => e._staffHoursId !== id);
   save();
 }
-
 function advanceOutstanding (personType, personId) {
-  return DB.advances
-    .filter(a => a.personType === personType && a.personId === personId && !a.settled)
-    .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  return DB.advances.filter(a => a.personType === personType && a.personId === personId && !a.settled).reduce((s, a) => s + (Number(a.amount) || 0), 0);
 }
 function advanceTotalInPeriod (personType, personId, from, to) {
-  return DB.advances
-    .filter(a => a.personType === personType && a.personId === personId)
-    .filter(a => a.date >= from && a.date <= to)
-    .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  return DB.advances.filter(a => a.personType === personType && a.personId === personId).filter(a => a.date >= from && a.date <= to).reduce((s, a) => s + (Number(a.amount) || 0), 0);
 }
 function toggleAdvanceSettled (id) {
   const a = DB.advances.find(x => x.id === id);
   if (!a) return;
   a.settled = !a.settled;
-  save();
-  showSuccess();
-  toast(a.settled ? 'Marked settled' : 'Marked outstanding');
+  save(); showSuccess(); toast(a.settled ? 'Marked settled' : 'Marked outstanding');
   if (currentReport === 'advance') renderReportContent();
 }
 window.toggleAdvanceSettled = toggleAdvanceSettled;
 function deleteAdvance (id) {
   if (!confirm('Delete this advance entry?')) return;
   DB.advances = DB.advances.filter(x => x.id !== id);
-  save();
-  showSuccess();
-  toast('Deleted');
+  save(); showSuccess(); toast('Deleted');
   if (currentReport === 'advance') renderReportContent();
 }
 window.deleteAdvance = deleteAdvance;
@@ -810,8 +794,7 @@ function nextRunHint (r) {
   if (r.frequency === 'weekly') return 'Every ' + start.toLocaleDateString('en-IN', { weekday:'long' });
   if (r.frequency === 'monthly') {
     const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-    const effective = Math.min(start.getDate(), lastDay);
-    return 'On the ' + effective + ' of each month';
+    return 'On the ' + Math.min(start.getDate(), lastDay) + ' of each month';
   }
   return '—';
 }
@@ -936,14 +919,10 @@ function seed () {
   };
 }
 
-/* ── Local database ─────────────────────────────────────────────── */
 let isFreshSeed = false;
 let DB;
-try {
-  const r = localStorage.getItem(LS);
-  if (r) DB = JSON.parse(r);
-  else { DB = seed(); isFreshSeed = true; }
-} catch (e) { DB = seed(); isFreshSeed = true; }
+try { const r = localStorage.getItem(LS); if (r) DB = JSON.parse(r); else { DB = seed(); isFreshSeed = true; } }
+catch (e) { DB = seed(); isFreshSeed = true; }
 
 function normalizeDB () {
   DB.employees = Array.isArray(DB.employees) ? DB.employees : [];
@@ -952,18 +931,10 @@ function normalizeDB () {
   DB.expenses = Array.isArray(DB.expenses) ? DB.expenses : [];
   DB.production = Array.isArray(DB.production) ? DB.production : [];
   DB.recents = DB.recents || [];
-  DB.companyStaff = Array.isArray(DB.companyStaff) ? DB.companyStaff.map(s => ({
-    ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
-  })) : [];
+  DB.companyStaff = Array.isArray(DB.companyStaff) ? DB.companyStaff.map(s => ({ ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26 })) : [];
   DB.staffHours = Array.isArray(DB.staffHours) ? DB.staffHours : [];
-  DB.recurring = Array.isArray(DB.recurring) ? DB.recurring.map(r => ({
-    ...r, amount: Number(r.amount) || 0,
-    frequency: RECUR_FREQ.includes(r.frequency) ? r.frequency : 'daily',
-    active: r.active !== false, startDate: r.startDate || todayISO(),
-  })) : [];
-  DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({
-    ...a, amount: Number(a.amount) || 0, settled: a.settled === true,
-  })) : [];
+  DB.recurring = Array.isArray(DB.recurring) ? DB.recurring.map(r => ({ ...r, amount: Number(r.amount) || 0, frequency: RECUR_FREQ.includes(r.frequency) ? r.frequency : 'daily', active: r.active !== false, startDate: r.startDate || todayISO() })) : [];
+  DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({ ...a, amount: Number(a.amount) || 0, settled: a.settled === true })) : [];
   DB.admin = DB.admin || { pin:'1234', name:'Admin' };
   DB.account = DB.account || { pin:'1605', name:'Account' };
   DB.session = DB.session || null;
@@ -973,29 +944,20 @@ function normalizeDB () {
 }
 normalizeDB();
 
-/* ── Shard helpers ──────────────────────────────────────────────── */
 const _snap = {};
 function shardDataOnly (name) {
-  const out = {};
-  const def = SHARD_DEFS[name];
+  const out = {}; const def = SHARD_DEFS[name];
   if (def) def.keys.forEach(k => { out[k] = DB[k]; });
   return out;
 }
 function applyShard (name, remote) {
-  const def = SHARD_DEFS[name];
-  if (!def || !remote) return false;
+  const def = SHARD_DEFS[name]; if (!def || !remote) return false;
   let changed = false;
-  def.keys.forEach(k => {
-    if (remote[k] !== undefined) { DB[k] = remote[k]; changed = true; }
-  });
+  def.keys.forEach(k => { if (remote[k] !== undefined) { DB[k] = remote[k]; changed = true; } });
   return changed;
 }
-function snapshotShards () {
-  SHARD_NAMES.forEach(n => { _snap[n] = JSON.stringify(shardDataOnly(n)); });
-}
-function dirtyShards () {
-  return SHARD_NAMES.filter(n => JSON.stringify(shardDataOnly(n)) !== _snap[n]);
-}
+function snapshotShards () { SHARD_NAMES.forEach(n => { _snap[n] = JSON.stringify(shardDataOnly(n)); }); }
+function dirtyShards () { return SHARD_NAMES.filter(n => JSON.stringify(shardDataOnly(n)) !== _snap[n]); }
 snapshotShards();
 
 let META;
@@ -1018,7 +980,7 @@ const isAdmin   = () => currentSession && currentSession.role === 'admin';
 const isAccount = () => currentSession && currentSession.role === 'account';
 
 /* ═══════════════════════════════════════════════════════════════════
-   SYNC — Firebase Firestore
+   SYNC — Firebase Firestore (real-time onSnapshot)
    ═══════════════════════════════════════════════════════════════════ */
 const Sync = {
   status: 'idle',
@@ -1044,9 +1006,9 @@ const Sync = {
         { getAuth, signInAnonymously, onAuthStateChanged },
         { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp },
       ] = await Promise.all([
-        import('https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js'),
-        import('https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js'),
-        import('https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js'),
+        import(`${FIREBASE_CDN}/firebase-app.js`),
+        import(`${FIREBASE_CDN}/firebase-auth.js`),
+        import(`${FIREBASE_CDN}/firebase-firestore.js`),
       ]);
       const app  = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
       const auth = getAuth(app);
@@ -1054,7 +1016,7 @@ const Sync = {
       if (!auth.currentUser) {
         await new Promise((resolve, reject) => {
           const unsub = onAuthStateChanged(auth,
-            (u) => { unsub(); u ? resolve(u) : signInAnonymously(auth).catch(reject); },
+            (u) => { unsub(); u ? resolve(u) : signInAnonymously(auth).then(resolve).catch(reject); },
             (err) => { unsub(); reject(err); });
         });
       }
@@ -1078,7 +1040,6 @@ const Sync = {
     this._pending.delete(name);
   },
 
-  /* ── pull (used on boot and on manual "Pull" button) ── */
   async pull (silent = false, forceReplace = false) {
     if (this._inFlight) return 'busy';
     this._inFlight = true;
@@ -1093,13 +1054,9 @@ const Sync = {
         if (!remote) continue;
         const remoteTs = remote._lastModified || 0;
         if (forceReplace || remoteTs > (localTs[n] || 0)) {
-          if (applyShard(n, remote)) {
-            localTs[n] = remoteTs;
-            changed = true;
-          }
+          if (applyShard(n, remote)) { localTs[n] = remoteTs; changed = true; }
         }
       }
-
       if (changed) {
         normalizeDB();
         snapshotShards();
@@ -1121,7 +1078,6 @@ const Sync = {
     } finally { this._inFlight = false; }
   },
 
-  /* ── push (called by save() indirectly) ── */
   queuePush (names) {
     (names || []).forEach(n => { if (SHARD_DEFS[n]) this._pending.add(n); });
     if (!this._bootstrapped || !this._pending.size) return;
@@ -1168,7 +1124,6 @@ const Sync = {
     } finally { this._inFlight = false; }
   },
 
-  /* ── real-time listener: this is what replaces polling ── */
   async _subscribe () {
     this._unsubs.forEach(u => { try { u(); } catch(e){} });
     this._unsubs = [];
@@ -1203,32 +1158,55 @@ const Sync = {
     }
   },
 
-  /* ── boot ── */
   async bootstrap () {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await this._ensureFirebase();
-        await this.pull(true, isFreshSeed);
+        const pullStatus = await this.pull(true, isFreshSeed);
         isFreshSeed = false;
 
-        // Fill in shards that don't exist yet in the cloud.
+        // Cloud unreachable on boot — don't push local state over remote.
+        if (pullStatus === 'failed') {
+          this.lastError = this.lastError || 'Cloud pull failed';
+          this.setStatus('error');
+          if (attempt < 3) {
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+            continue;
+          }
+          // Give up but keep the app usable — local only, red dot.
+          this._bootstrapped = true;
+          return;
+        }
+
         const fb = await this._ensureFirebase();
         const missing = [];
         for (const n of SHARD_NAMES) {
-          const remote = await this._readShard(fb, n);
-          if (!remote) missing.push(n);
-          else if ((remote._lastModified || 0) > ((DB._shardTs || {})[n] || 0) && applyShard(n, remote)) {
-            DB._shardTs[n] = remote._lastModified;
-          }
+          try {
+            const remote = await this._readShard(fb, n);
+            if (!remote) missing.push(n);
+          } catch (e) { /* skip this shard; retried next save */ }
         }
+
+        this._bootstrapped = true;
+
         if (missing.length) {
-          normalizeDB(); snapshotShards();
+          // First-time setup: push all shards so the cloud mirrors local.
+          normalizeDB();
+          snapshotShards();
           missing.forEach(n => this._pending.add(n));
           await this.push(true);
+        } else {
+          // Any local-only dirty shards (e.g. closed app before debounce)?
+          const dirty = dirtyShards();
+          if (dirty.length) {
+            dirty.forEach(n => this._pending.add(n));
+            await this.push(false);
+          } else {
+            this.setStatus('synced');
+          }
         }
-        this._bootstrapped = true;
+
         await this._subscribe();
-        this.setStatus('synced');
         return;
       } catch (e) {
         this.lastError = e.message;
@@ -1295,8 +1273,7 @@ function pickRestoreFile () {
       DB = { ...remote, session: liveSession || null, _shardTs: {}, _lastModified: Date.now() };
       normalizeDB();
       DB.session = liveSession || null;
-      save();
-      showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
+      save(); showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
       setTimeout(() => Sync.push(true), 500);
     } catch (err) { toast('Restore failed: ' + err.message, { success:false }); }
   };
@@ -1321,15 +1298,11 @@ function entryRevenue (p) {
   return (Number(p.qty) || 0) * b.sellingPrice * ((Number(p.rate) || 0) / tc);
 }
 
-const filterState = {
-  dateType: 'preset', preset: 'today', from: '', to: '',
-  operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all',
-};
+const filterState = { dateType: 'preset', preset: 'today', from: '', to: '', operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all' };
 function resolveDateRange () {
   const today = new Date(); today.setHours(0,0,0,0);
   if (filterState.dateType === 'custom') {
-    let f = filterState.from || isoLocal(today);
-    let t = filterState.to   || isoLocal(today);
+    let f = filterState.from || isoLocal(today); let t = filterState.to || isoLocal(today);
     if (f > t) [f, t] = [t, f];
     return { from: f, to: t };
   }
@@ -1339,11 +1312,7 @@ function resolveDateRange () {
   if (p === '7d') { const d = new Date(today); d.setDate(d.getDate()-6); return { from: isoLocal(d), to: isoLocal(today) }; }
   if (p === '30d') { const d = new Date(today); d.setDate(d.getDate()-29); return { from: isoLocal(d), to: isoLocal(today) }; }
   if (p === 'month') return { from: isoLocal(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoLocal(today) };
-  if (p === 'last_month') {
-    const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
-    const e = new Date(today.getFullYear(), today.getMonth(), 0);
-    return { from: isoLocal(s), to: isoLocal(e) };
-  }
+  if (p === 'last_month') { const s = new Date(today.getFullYear(), today.getMonth()-1, 1); const e = new Date(today.getFullYear(), today.getMonth(), 0); return { from: isoLocal(s), to: isoLocal(e) }; }
   if (p === 'all') return { from: '1970-01-01', to: isoLocal(today) };
   return { from: isoLocal(today), to: isoLocal(today) };
 }
@@ -1376,13 +1345,11 @@ function getFilteredStats () {
 }
 
 function toast (msg, opts = {}) {
-  const t = $('#toast');
-  const ok = opts.success !== false;
+  const t = $('#toast'); const ok = opts.success !== false;
   t.innerHTML = (ok ? `<span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>` : '') + `<span>${escapeHtml(msg)}</span>`;
   t.className = 'toast' + (ok ? ' success' : '');
   requestAnimationFrame(() => t.classList.add('on'));
-  clearTimeout(t._tm);
-  t._tm = setTimeout(() => t.classList.remove('on'), 2400);
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove('on'), 2400);
 }
 function haptic (type='light') {
   if (!navigator.vibrate) return;
@@ -1397,8 +1364,7 @@ function addRipple (el, e, dark=false) {
   const y = (e.clientY || rect.top + rect.height/2) - rect.top - size/2;
   const r = document.createElement('span');
   r.style.cssText = `position:absolute;border-radius:50%;background:${dark?'rgba(15,23,42,.08)':'rgba(255,255,255,.4)'};transform:scale(0);animation:rippleAnim .6s;pointer-events:none;width:${size}px;height:${size}px;left:${x}px;top:${y}px;`;
-  el.style.position = el.style.position || 'relative';
-  el.style.overflow = 'hidden';
+  el.style.position = el.style.position || 'relative'; el.style.overflow = 'hidden';
   el.appendChild(r); setTimeout(() => r.remove(), 620);
 }
 function countUp (el, from, to, dur=700, fmt) {
@@ -1414,10 +1380,7 @@ function attachRipple () {
   $$('.btn, .ios-row, .qa, .tab, .qbtn, .qquick button, .report-card, .filter-chip, .op-chip, .bundle-card, .reasons button, .reject-ctrl button, .kpi-card, .share-btn, .login-keypad button, .role-btn, .salary-emp, .chip-row button, .hours-list .hl-del, .month-nav button, .adv-set-chip, .expense-list-item').forEach(el => {
     if (el._rippled) return; el._rippled = true;
     el.addEventListener('pointerdown', e => {
-      const dark = (el.classList.contains('btn') && (el.classList.contains('gray') || el.classList.contains('outline') || el.classList.contains('share-btn'))) ||
-        (el.classList.contains('filter-chip') && !el.classList.contains('on')) ||
-        (el.classList.contains('role-btn') && !el.classList.contains('on')) ||
-        el.classList.contains('chip-row');
+      const dark = (el.classList.contains('btn') && (el.classList.contains('gray') || el.classList.contains('outline') || el.classList.contains('share-btn'))) || (el.classList.contains('filter-chip') && !el.classList.contains('on')) || (el.classList.contains('role-btn') && !el.classList.contains('on')) || el.classList.contains('chip-row');
       addRipple(el, e, dark);
     });
   });
@@ -1425,12 +1388,7 @@ function attachRipple () {
 
 let loginRole = 'admin';
 let pinBuf = '';
-function updatePinSlots () {
-  $$('#pinSlots .pin-slot').forEach((s, i) => {
-    s.textContent = i < pinBuf.length ? '•' : '';
-    s.classList.toggle('filled', i < pinBuf.length);
-  });
-}
+function updatePinSlots () { $$('#pinSlots .pin-slot').forEach((s, i) => { s.textContent = i < pinBuf.length ? '•' : ''; s.classList.toggle('filled', i < pinBuf.length); }); }
 function setLoginRole (role) {
   loginRole = role;
   $$('.role-btn').forEach(b => b.classList.toggle('on', b.dataset.role === role));
@@ -1443,16 +1401,12 @@ function attemptLogin () {
   if (pinBuf === exp) {
     const session = { role: loginRole, ts: Date.now() };
     DB.session = session; save(); currentSession = session;
-    haptic('success');
-    showSuccess();
+    haptic('success'); showSuccess();
     const le = $('#loginScreen'); le.classList.add('hidden');
     setTimeout(() => { le.style.display = 'none'; }, 380);
     $('#app').classList.remove('hidden');
     bootApp();
-  } else {
-    haptic('medium'); toast('Invalid PIN', {success:false});
-    pinBuf = ''; updatePinSlots();
-  }
+  } else { haptic('medium'); toast('Invalid PIN', {success:false}); pinBuf = ''; updatePinSlots(); }
 }
 function logout () {
   DB.session = null; currentSession = null; save();
@@ -1497,8 +1451,7 @@ function nav (sc, opts = {}) {
   $('#screens').scrollTop = 0;
   currentScreen = sc;
   const fab = $('#fab');
-  if (sc === 'work') fab.classList.remove('hidden');
-  else fab.classList.add('hidden');
+  if (sc === 'work') fab.classList.remove('hidden'); else fab.classList.add('hidden');
   if (sc === 'reportDetail') {
     $('#navBack').style.visibility = 'visible';
     $('#pageTitle').textContent = opts.title || 'Report';
@@ -1512,12 +1465,12 @@ function nav (sc, opts = {}) {
     $('#navTitle').classList.remove('visible');
     $('#navShare').style.visibility = 'hidden';
   }
-  if (sc === 'home')          renderHome();
-  if (sc === 'work')          renderWork();
-  if (sc === 'bundles')       renderBundles();
-  if (sc === 'reports')       renderReports();
-  if (sc === 'team')          renderTeam();
-  if (sc === 'reportDetail')  renderReportDetail();
+  if (sc === 'home') renderHome();
+  if (sc === 'work') renderWork();
+  if (sc === 'bundles') renderBundles();
+  if (sc === 'reports') renderReports();
+  if (sc === 'team') renderTeam();
+  if (sc === 'reportDetail') renderReportDetail();
 }
 window.nav = nav;
 function refreshCurrentScreen () {
@@ -1561,9 +1514,7 @@ function renderHome () {
   const isAcc = isAccount();
   const heroTitle = isAcc ? "Today's Net Profit" : "Today's Total Cost";
   const heroValue = isAcc ? s.net : s.total;
-  const heroSub = isAcc
-    ? (s.margin >= 0 ? '▲' : '▼') + Math.abs(s.margin).toFixed(1) + '% margin'
-    : 'Piece wages + expenses';
+  const heroSub = isAcc ? (s.margin >= 0 ? '▲' : '▼') + Math.abs(s.margin).toFixed(1) + '% margin' : 'Piece wages + expenses';
   const outstandingAdv = DB.advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount)||0), 0);
 
   $('#heroWrap').innerHTML = `
@@ -1585,8 +1536,7 @@ function renderHome () {
           <div class="hero-stat"><div class="hsl">Advance Out</div><div class="hsv" id="heroAdv">₹0</div></div>
         `}
       </div>
-    </div>
-  `;
+    </div>`;
   setTimeout(() => {
     countUp($('#heroAmount'), 0, heroValue, 1000, n => (n < 0 ? '-₹' : '₹') + Math.round(Math.abs(n)).toLocaleString('en-IN'));
     if (isAcc) countUp($('#heroRev'), 0, s.revenue, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
@@ -1612,8 +1562,7 @@ function renderHome () {
       <div class="kcl">${k.l}</div>
       <div class="kcv"><span data-kpi="${i}">0</span>${k.u ? `<span class="u">${k.u}</span>` : ''}</div>
       <div class="kcs">${k.sub}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
   setTimeout(() => { $$('[data-kpi]').forEach((el, i) => countUp(el, 0, kpis[i].v, 900, kpis[i].f)); }, 90);
 
   const q = [
@@ -1677,10 +1626,7 @@ function renderWork () {
     workFilter === 'month' ? (() => { const d = new Date(); const s = new Date(d.getFullYear(), d.getMonth(), 1); return { from: isoLocal(s), to: today }; })() :
     { from: '1970-01-01', to: today };
   let rows = DB.production.filter(x => x.date >= r.from && x.date <= r.to);
-  if (workSearch) {
-    const q = workSearch.toLowerCase();
-    rows = rows.filter(x => (x.operatorName || '').toLowerCase().includes(q) || (x.bundleName || '').toLowerCase().includes(q) || (x.operation || '').toLowerCase().includes(q));
-  }
+  if (workSearch) { const q = workSearch.toLowerCase(); rows = rows.filter(x => (x.operatorName || '').toLowerCase().includes(q) || (x.bundleName || '').toLowerCase().includes(q) || (x.operation || '').toLowerCase().includes(q)); }
   rows = [...rows].sort((a,b) => (b.ts || 0) - (a.ts || 0));
 
   if (!rows.length) {
@@ -1745,19 +1691,11 @@ function renderReports () {
       <div class="rc-ic" style="background:${grad(r.g)}">${icon(r.ic)}</div>
       <div class="rc-body"><div class="t">${r.t}</div><div class="s">${r.s}</div></div>
       <svg class="chev"><use href="#i-chev"/></svg>
-    </div>
-  `).join('');
+    </div>`).join('');
   attachRipple();
 }
 function grad (g) {
-  return {
-    teal:'linear-gradient(135deg,#0F766E,#14B8A6)', blue:'linear-gradient(135deg,#2563EB,#3B82F6)',
-    purple:'linear-gradient(135deg,#7C3AED,#A855F7)', orange:'linear-gradient(135deg,#EA580C,#F59E0B)',
-    red:'linear-gradient(135deg,#DC2626,#EF4444)', emerald:'linear-gradient(135deg,#059669,#10B981)',
-    gold:'linear-gradient(135deg,#D97706,#F59E0B)', gray:'linear-gradient(135deg,#64748B,#94A3B8)',
-    cyan:'linear-gradient(135deg,#0891B2,#06B6D4)', pink:'linear-gradient(135deg,#DB2777,#F472B6)',
-    lime:'linear-gradient(135deg,#65A30D,#84CC16)', rose:'linear-gradient(135deg,#E11D48,#FB7185)',
-  }[g] || 'linear-gradient(135deg,#0F766E,#14B8A6)';
+  return { teal:'linear-gradient(135deg,#0F766E,#14B8A6)', blue:'linear-gradient(135deg,#2563EB,#3B82F6)', purple:'linear-gradient(135deg,#7C3AED,#A855F7)', orange:'linear-gradient(135deg,#EA580C,#F59E0B)', red:'linear-gradient(135deg,#DC2626,#EF4444)', emerald:'linear-gradient(135deg,#059669,#10B981)', gold:'linear-gradient(135deg,#D97706,#F59E0B)', gray:'linear-gradient(135deg,#64748B,#94A3B8)', cyan:'linear-gradient(135deg,#0891B2,#06B6D4)', pink:'linear-gradient(135deg,#DB2777,#F472B6)', lime:'linear-gradient(135deg,#65A30D,#84CC16)', rose:'linear-gradient(135deg,#E11D48,#FB7185)' }[g] || 'linear-gradient(135deg,#0F766E,#14B8A6)';
 }
 
 let teamTab = 'operators', teamSearch = '';
@@ -1855,9 +1793,7 @@ function openOperatorForm (emp) {
     renderTeam(); return true;
   });
   setTimeout(() => {
-    $$('#opStatus button').forEach(b => b.addEventListener('click', () => {
-      $$('#opStatus button').forEach(x => x.classList.remove('on')); b.classList.add('on');
-    }));
+    $$('#opStatus button').forEach(b => b.addEventListener('click', () => { $$('#opStatus button').forEach(x => x.classList.remove('on')); b.classList.add('on'); }));
     const del = $('#opDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this operator?')) return;
@@ -1932,12 +1868,7 @@ function openBundleForm (bundle) {
       <button type="button" class="btn gray sm" id="bAddOp" style="margin-top:8px;width:100%">${icon('i-plus')} Add Operation Row</button>
     </div>
     <div class="amt-preview"><div class="al">Total cost per piece</div><div class="av" id="bTotalCost">₹0</div></div>
-    ${acc && b.sellingPrice ? `
-      <div class="amt-preview" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-color:rgba(217,119,6,.25)">
-        <div class="al" style="color:var(--gold)">Margin per piece</div>
-        <div class="av" style="color:var(--gold)" id="bMargin">₹0</div>
-      </div>
-    ` : ''}
+    ${acc && b.sellingPrice ? `<div class="amt-preview" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-color:rgba(217,119,6,.25)"><div class="al" style="color:var(--gold)">Margin per piece</div><div class="av" style="color:var(--gold)" id="bMargin">₹0</div></div>` : ''}
     ${isEdit ? `<button class="btn red" id="bDelete" style="margin-top:8px">${icon('i-trash')} Delete Bundle</button>` : ''}
   `;
   openSheet(isEdit ? 'Edit Bundle' : 'New Bundle', html, () => {
@@ -1962,10 +1893,7 @@ function openBundleForm (bundle) {
       $$('#opRows .op-edit-row').forEach(row => { t += Number(row.querySelector('[data-k="rate"]').value) || 0; });
       const el = $('#bTotalCost'); if (el) el.textContent = money(t);
       const mEl = $('#bMargin');
-      if (mEl) {
-        const sp = Number(($('#bPrice') || {}).value) || 0;
-        mEl.textContent = money(sp - t);
-      }
+      if (mEl) { const sp = Number(($('#bPrice') || {}).value) || 0; mEl.textContent = money(sp - t); }
     };
     $$('#opRows input').forEach(inp => inp.addEventListener('input', refreshTotals));
     const pEl = $('#bPrice'); if (pEl) pEl.addEventListener('input', refreshTotals);
@@ -1981,17 +1909,12 @@ function openBundleForm (bundle) {
       div.querySelectorAll('input').forEach(i => i.addEventListener('input', refreshTotals));
       refreshTotals();
     });
-    function bindRemove (row) {
-      const btn = row.querySelector('.rm');
-      if (btn) btn.addEventListener('click', () => { row.remove(); refreshTotals(); });
-    }
+    function bindRemove (row) { const btn = row.querySelector('.rm'); if (btn) btn.addEventListener('click', () => { row.remove(); refreshTotals(); }); }
     $$('#opRows .op-edit-row').forEach(bindRemove);
     const del = $('#bDelete');
     if (del) del.addEventListener('click', () => {
       const used = DB.production.filter(p => p.bundleId === bundle.id).length;
-      const msg = used > 0
-        ? `This bundle has ${used} production entr${used === 1 ? 'y' : 'ies'}. Deleting will keep the entries but unlink them from the bundle. Continue?`
-        : 'Delete this bundle?';
+      const msg = used > 0 ? `This bundle has ${used} production entr${used === 1 ? 'y' : 'ies'}. Deleting will keep the entries but unlink them from the bundle. Continue?` : 'Delete this bundle?';
       if (!confirm(msg)) return;
       DB.bundles = DB.bundles.filter(x => x.id !== bundle.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); renderBundles();
@@ -2017,38 +1940,17 @@ function openEntryForm (existing, preselectEmpId) {
   if (!DB.bundles.length) { toast('Add a bundle first', {success:false}); nav('bundles'); return; }
   const bundlesWithOps = DB.bundles.filter(b => b.ops && b.ops.length > 0);
   if (!bundlesWithOps.length) { toast('Add operations to a bundle first', {success:false}); nav('bundles'); return; }
-
   const activeEmps = DB.employees.filter(x => x.status === 'Active');
   if (!activeEmps.length && !existing) { toast('No active operators', {success:false}); nav('team'); return; }
 
   const firstBundle = bundlesWithOps.find(b => b.id === (existing ? existing.bundleId : null)) || bundlesWithOps[0];
-  const e = existing || {
-    id: '', date: todayISO(),
-    empId: preselectEmpId || activeEmps[0].id,
-    bundleId: firstBundle.id,
-    operation: firstBundle.ops[0]?.name || '',
-    rate: firstBundle.ops[0]?.rate || 0,
-    qty: 0, reject: 0, rejectReason: '', amount: 0, notes: '',
-  };
+  const e = existing || { id:'', date: todayISO(), empId: preselectEmpId || activeEmps[0].id, bundleId: firstBundle.id, operation: firstBundle.ops[0]?.name || '', rate: firstBundle.ops[0]?.rate || 0, qty: 0, reject: 0, rejectReason: '', amount: 0, notes: '' };
   const emp = DB.employees.find(x => x.id === e.empId) || activeEmps[0];
   const bundle = bundlesWithOps.find(x => x.id === e.bundleId) || firstBundle;
   const state = { ...e, empId: emp.id, bundleId: bundle.id };
-  const empChips = activeEmps.map(x =>
-    `<button type="button" class="op-chip ${x.id===state.empId?'on':''}" data-emp="${x.id}">
-       <div class="ocn">${escapeHtml(x.name)}</div>
-       <div class="ocr">${escapeHtml(x.id)} · ${escapeHtml(x.line)}</div>
-     </button>`).join('');
-  const bundleChips = bundlesWithOps.map(x =>
-    `<div class="bundle-card ${x.id===state.bundleId?'on':''}" data-bundle="${x.id}">
-       <div class="bn">${escapeHtml(x.name)}</div>
-       <div class="bs">${escapeHtml(x.style||'')}</div>
-       <div class="bc">${x.ops.length} ops · ₹${bundleCostPerPiece(x)}/pc</div>
-     </div>`).join('');
-  const ops = bundle.ops.map(o =>
-    `<button type="button" class="op-chip ${o.name===state.operation?'on':''}" data-op="${escapeHtml(o.name)}" data-rate="${o.rate}">
-       <div class="ocn">${escapeHtml(o.name)}</div>
-       <div class="ocr">₹${o.rate}/pc</div>
-     </button>`).join('');
+  const empChips = activeEmps.map(x => `<button type="button" class="op-chip ${x.id===state.empId?'on':''}" data-emp="${x.id}"><div class="ocn">${escapeHtml(x.name)}</div><div class="ocr">${escapeHtml(x.id)} · ${escapeHtml(x.line)}</div></button>`).join('');
+  const bundleChips = bundlesWithOps.map(x => `<div class="bundle-card ${x.id===state.bundleId?'on':''}" data-bundle="${x.id}"><div class="bn">${escapeHtml(x.name)}</div><div class="bs">${escapeHtml(x.style||'')}</div><div class="bc">${x.ops.length} ops · ₹${bundleCostPerPiece(x)}/pc</div></div>`).join('');
+  const ops = bundle.ops.map(o => `<button type="button" class="op-chip ${o.name===state.operation?'on':''}" data-op="${escapeHtml(o.name)}" data-rate="${o.rate}"><div class="ocn">${escapeHtml(o.name)}</div><div class="ocr">₹${o.rate}/pc</div></button>`).join('');
 
   const html = `
     <div class="entry-hero">
@@ -2096,22 +1998,9 @@ function openEntryForm (existing, preselectEmpId) {
     const date = $('#entDate').value || todayISO();
     const rate = Number(state.rate) || 0;
     const amount = rate * qty;
-    const rec = {
-      id: existing ? existing.id : uid('p'),
-      date, ts: existing ? existing.ts : Date.now(),
-      empId: empNow.id, operatorName: empNow.name, line: empNow.line,
-      bundleId: bundleNow.id, bundleName: bundleNow.name,
-      operation: state.operation, rate, qty,
-      reject: Number(state.reject) || 0,
-      rejectReason: state.rejectReason || '',
-      amount,
-      notes: $('#entNotes').value.trim(),
-    };
+    const rec = { id: existing ? existing.id : uid('p'), date, ts: existing ? existing.ts : Date.now(), empId: empNow.id, operatorName: empNow.name, line: empNow.line, bundleId: bundleNow.id, bundleName: bundleNow.name, operation: state.operation, rate, qty, reject: Number(state.reject) || 0, rejectReason: state.rejectReason || '', amount, notes: $('#entNotes').value.trim() };
     if (existing) DB.production[DB.production.findIndex(x => x.id === existing.id)] = rec;
-    else {
-      DB.production.push(rec);
-      DB.recents = [empNow.id, ...DB.recents.filter(x => x !== empNow.id)].slice(0, 3);
-    }
+    else { DB.production.push(rec); DB.recents = [empNow.id, ...DB.recents.filter(x => x !== empNow.id)].slice(0, 3); }
     save(); showSuccess(); toast(existing ? 'Updated' : 'Logged');
     refreshCurrentScreen(); return true;
   });
@@ -2126,33 +2015,14 @@ function openEntryForm (existing, preselectEmpId) {
     const refreshOps = () => {
       const b = DB.bundles.find(x => x.id === state.bundleId);
       if (!b) return;
-      if (!b.ops.some(o => o.name === state.operation)) {
-        state.operation = b.ops[0]?.name || '';
-        state.rate = b.ops[0]?.rate || 0;
-      }
+      if (!b.ops.some(o => o.name === state.operation)) { state.operation = b.ops[0]?.name || ''; state.rate = b.ops[0]?.rate || 0; }
       const container = $('#entOps');
-      container.innerHTML = b.ops.map(o =>
-        `<button type="button" class="op-chip ${o.name===state.operation?'on':''}" data-op="${escapeHtml(o.name)}" data-rate="${o.rate}">
-           <div class="ocn">${escapeHtml(o.name)}</div><div class="ocr">₹${o.rate}/pc</div>
-         </button>`).join('');
+      container.innerHTML = b.ops.map(o => `<button type="button" class="op-chip ${o.name===state.operation?'on':''}" data-op="${escapeHtml(o.name)}" data-rate="${o.rate}"><div class="ocn">${escapeHtml(o.name)}</div><div class="ocr">₹${o.rate}/pc</div></button>`).join('');
       bindOps(); refreshAmount();
     };
-    const bindOps = () => {
-      $$('#entOps .op-chip').forEach(b => b.addEventListener('click', () => {
-        $$('#entOps .op-chip').forEach(x => x.classList.remove('on')); b.classList.add('on');
-        state.operation = b.dataset.op;
-        state.rate = Number(b.dataset.rate) || 0;
-        refreshAmount();
-      }));
-    };
-    $$('#entEmps .op-chip').forEach(b => b.addEventListener('click', () => {
-      $$('#entEmps .op-chip').forEach(x => x.classList.remove('on')); b.classList.add('on');
-      state.empId = b.dataset.emp;
-    }));
-    $$('#entBundles .bundle-card').forEach(b => b.addEventListener('click', () => {
-      $$('#entBundles .bundle-card').forEach(x => x.classList.remove('on')); b.classList.add('on');
-      state.bundleId = b.dataset.bundle; refreshOps();
-    }));
+    const bindOps = () => { $$('#entOps .op-chip').forEach(b => b.addEventListener('click', () => { $$('#entOps .op-chip').forEach(x => x.classList.remove('on')); b.classList.add('on'); state.operation = b.dataset.op; state.rate = Number(b.dataset.rate) || 0; refreshAmount(); })); };
+    $$('#entEmps .op-chip').forEach(b => b.addEventListener('click', () => { $$('#entEmps .op-chip').forEach(x => x.classList.remove('on')); b.classList.add('on'); state.empId = b.dataset.emp; }));
+    $$('#entBundles .bundle-card').forEach(b => b.addEventListener('click', () => { $$('#entBundles .bundle-card').forEach(x => x.classList.remove('on')); b.classList.add('on'); state.bundleId = b.dataset.bundle; refreshOps(); }));
     bindOps();
     $('#qPlus').addEventListener('click', () => { state.qty = (state.qty||0) + 1; refreshAmount(); haptic('light'); });
     $('#qMinus').addEventListener('click', () => { state.qty = Math.max(0, (state.qty||0) - 1); refreshAmount(); haptic('light'); });
@@ -2194,13 +2064,7 @@ function openExpenseForm (exp) {
     const amount = Number($('#expAmt').value) || 0;
     if (amount <= 0) { toast('Enter an amount', {success:false}); return false; }
     const activeCat = $('#expCat .on');
-    const rec = {
-      id: exp ? exp.id : uid('e'),
-      date: $('#expDate').value || todayISO(),
-      ts: exp ? exp.ts : Date.now(),
-      category: activeCat ? activeCat.dataset.v : EXPENSE_CATEGORIES[0],
-      amount, note: $('#expNote').value.trim(),
-    };
+    const rec = { id: exp ? exp.id : uid('e'), date: $('#expDate').value || todayISO(), ts: exp ? exp.ts : Date.now(), category: activeCat ? activeCat.dataset.v : EXPENSE_CATEGORIES[0], amount, note: $('#expNote').value.trim() };
     if (exp && exp._staffHoursId) rec._staffHoursId = exp._staffHoursId;
     if (exp && exp._recurringId) rec._recurringId = exp._recurringId;
     if (exp && exp.auto) rec.auto = true;
@@ -2210,9 +2074,7 @@ function openExpenseForm (exp) {
     refreshCurrentScreen(); return true;
   });
   setTimeout(() => {
-    $$('#expCat button').forEach(b => b.addEventListener('click', () => {
-      $$('#expCat button').forEach(x => x.classList.remove('on')); b.classList.add('on');
-    }));
+    $$('#expCat button').forEach(b => b.addEventListener('click', () => { $$('#expCat button').forEach(x => x.classList.remove('on')); b.classList.add('on'); }));
     const del = $('#expDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this expense?')) return;
@@ -2244,10 +2106,7 @@ function openAddAdvance (preselectedType, preselectedId) {
         <button type="button" class="${initType === 'staff' ? 'on' : ''}" data-v="staff">Company Staff</button>
       </div>
     </div>
-    <div class="field">
-      <label>Person</label>
-      <select id="advPerson">${buildOptions(initType)}</select>
-    </div>
+    <div class="field"><label>Person</label><select id="advPerson">${buildOptions(initType)}</select></div>
     <div class="field"><label>Date</label><input id="advDate" type="date" value="${todayISO()}"></div>
     <div class="field"><label>Amount (₹)</label><input id="advAmount" type="number" inputmode="decimal" min="0" step="1" placeholder="0"></div>
     <div class="field"><label>Note (optional)</label><input id="advNote" placeholder="e.g. Mid-month advance"></div>
@@ -2263,36 +2122,19 @@ function openAddAdvance (preselectedType, preselectedId) {
     if (!personId) { toast('Select a person', {success:false}); return false; }
     if (amount <= 0) { toast('Enter an amount', {success:false}); return false; }
     let personName = '';
-    if (personType === 'operator') {
-      const e = DB.employees.find(x => x.id === personId);
-      if (!e) { toast('Person not found', {success:false}); return false; }
-      personName = e.name;
-    } else {
-      const s = DB.companyStaff.find(x => x.id === personId);
-      if (!s) { toast('Person not found', {success:false}); return false; }
-      personName = s.name;
-    }
-    const rec = {
-      id: uid('adv'), personType, personId, personName,
-      date: $('#advDate').value || todayISO(),
-      amount, note: $('#advNote').value.trim(),
-      settled: false, ts: Date.now(),
-    };
+    if (personType === 'operator') { const e = DB.employees.find(x => x.id === personId); if (!e) { toast('Person not found', {success:false}); return false; } personName = e.name; }
+    else { const s = DB.companyStaff.find(x => x.id === personId); if (!s) { toast('Person not found', {success:false}); return false; } personName = s.name; }
+    const rec = { id: uid('adv'), personType, personId, personName, date: $('#advDate').value || todayISO(), amount, note: $('#advNote').value.trim(), settled: false, ts: Date.now() };
     DB.advances.push(rec);
-    save(); showSuccess();
-    toast('Advance of ' + money(amount) + ' recorded');
+    save(); showSuccess(); toast('Advance of ' + money(amount) + ' recorded');
     if (currentReport === 'advance') renderReportContent();
     else refreshCurrentScreen();
     return true;
   });
   setTimeout(() => {
     $$('#advType button').forEach(b => b.addEventListener('click', () => {
-      $$('#advType button').forEach(x => x.classList.remove('on'));
-      b.classList.add('on');
-      const t = b.dataset.v;
-      const sel = $('#advPerson');
-      sel.innerHTML = buildOptions(t);
-      updatePreview();
+      $$('#advType button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+      const t = b.dataset.v; const sel = $('#advPerson'); sel.innerHTML = buildOptions(t); updatePreview();
     }));
     const updatePreview = () => {
       const typeBtn = $('#advType .on');
@@ -2332,16 +2174,7 @@ function openCompanyStaffForm (s) {
     <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('staff','${s.id}')" style="width:100%;margin-bottom:14px">${icon('i-plus')} Record Advance</button>
   ` : '';
   const recent = s ? [...DB.staffHours.filter(h => h.staffId === s.id)].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 7) : [];
-  const hoursListHtml = recent.length ? `
-    <div class="hours-list" id="staffHoursList">
-      ${recent.map(h => `
-        <div class="hl-row" data-hid="${h.id}">
-          <span class="hl-date">${dateShort(h.date)}</span>
-          <span class="hl-hrs">${h.hours}h × ₹${h.hourlyRate.toFixed(2)}</span>
-          <span class="hl-amt">${money(h.amount)}</span>
-          <button type="button" class="hl-del" data-del="${h.id}">×</button>
-        </div>`).join('')}
-    </div>` : '';
+  const hoursListHtml = recent.length ? `<div class="hours-list" id="staffHoursList">${recent.map(h => `<div class="hl-row" data-hid="${h.id}"><span class="hl-date">${dateShort(h.date)}</span><span class="hl-hrs">${h.hours}h × ₹${h.hourlyRate.toFixed(2)}</span><span class="hl-amt">${money(h.amount)}</span><button type="button" class="hl-del" data-del="${h.id}">×</button></div>`).join('')}</div>` : '';
   const html = `
     ${advBlock}
     <div class="field"><label>Name</label><input id="csName" placeholder="Full name" value="${escapeHtml(e.name)}"></div>
@@ -2414,17 +2247,11 @@ function openStaffHoursSheet () {
   const html = DB.companyStaff.map(s => {
     const rate = staffHourlyRate(s);
     const rec = staffHoursToday(s.id);
-    return `<div class="field" data-sid="${s.id}">
-      <label>${escapeHtml(s.name)} · ${money2(rate)}/hr</label>
-      <input class="sh-hours" data-sid="${s.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${rec ? rec.hours : ''}">
-    </div>`;
+    return `<div class="field" data-sid="${s.id}"><label>${escapeHtml(s.name)} · ${money2(rate)}/hr</label><input class="sh-hours" data-sid="${s.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${rec ? rec.hours : ''}"></div>`;
   }).join('');
   openSheet('Log Staff Hours · ' + dateDisplay(today), html, () => {
     let count = 0;
-    $$('.sh-hours').forEach(inp => {
-      const v = inp.value.trim(); if (v === '') return;
-      saveStaffHours(inp.dataset.sid, today, Number(v) || 0, ''); count++;
-    });
+    $$('.sh-hours').forEach(inp => { const v = inp.value.trim(); if (v === '') return; saveStaffHours(inp.dataset.sid, today, Number(v) || 0, ''); count++; });
     if (count > 0) { save(); showSuccess(); toast(count + ' saved'); }
     else toast('Nothing to save');
     refreshCurrentScreen(); return true;
@@ -2442,8 +2269,7 @@ function openRecurringSheet () {
         <div class="rowsub"><span>${money(r.amount)}</span><span class="dot">·</span><span>${escapeHtml(nextRunHint(r))}</span></div>
       </div>
       <div class="rowtrail"><div class="rtop">${escapeHtml(r.frequency)}</div></div>
-    </div>
-  `).join('');
+    </div>`).join('');
   const wrap = `
     <div class="hint" style="margin:0 4px 12px">Auto-created each time app opens. Already-created entries won't duplicate.</div>
     ${html}
@@ -2461,9 +2287,7 @@ function openRecurringForm (r) {
   const isEdit = !!r;
   const e = r || { id:'', category: EXPENSE_CATEGORIES[0], amount: 0, frequency: 'daily', startDate: todayISO(), endDate: '', note: '', active: true };
   const html = `
-    <div class="field"><label>Category</label>
-      <select id="recCat">${EXPENSE_CATEGORIES.map(c => `<option ${c===e.category?'selected':''}>${c}</option>`).join('')}</select>
-    </div>
+    <div class="field"><label>Category</label><select id="recCat">${EXPENSE_CATEGORIES.map(c => `<option ${c===e.category?'selected':''}>${c}</option>`).join('')}</select></div>
     <div class="field"><label>Amount (₹)</label><input id="recAmt" type="number" inputmode="decimal" min="0" step="1" value="${e.amount||''}"></div>
     <div class="field"><label>Frequency</label>
       <div class="chip-row" id="recFreq">${RECUR_FREQ.map(f => `<button type="button" class="${f===e.frequency?'on':''}" data-v="${f}">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`).join('')}</div>
@@ -2486,12 +2310,7 @@ function openRecurringForm (r) {
     const end = $('#recEnd').value || '';
     if (end && end < start) { toast('End date must be after start', {success:false}); return false; }
     const freqBtn = $('#recFreq .on'), activeBtn = $('#recActive .on');
-    const rec = {
-      id: r ? r.id : uid('rec'), category: $('#recCat').value, amount,
-      frequency: freqBtn ? freqBtn.dataset.v : 'daily',
-      startDate: start, endDate: end, note: $('#recNote').value.trim(),
-      active: activeBtn ? activeBtn.dataset.v === 'on' : true,
-    };
+    const rec = { id: r ? r.id : uid('rec'), category: $('#recCat').value, amount, frequency: freqBtn ? freqBtn.dataset.v : 'daily', startDate: start, endDate: end, note: $('#recNote').value.trim(), active: activeBtn ? activeBtn.dataset.v === 'on' : true };
     if (isEdit) DB.recurring[DB.recurring.findIndex(x => x.id === r.id)] = rec;
     else DB.recurring.push(rec);
     save();
@@ -2501,11 +2320,7 @@ function openRecurringForm (r) {
     refreshCurrentScreen(); return true;
   });
   setTimeout(() => {
-    ['#recFreq','#recActive'].forEach(sel => {
-      $$(sel + ' button').forEach(b => b.addEventListener('click', () => {
-        $$(sel + ' button').forEach(x => x.classList.remove('on')); b.classList.add('on');
-      }));
-    });
+    ['#recFreq','#recActive'].forEach(sel => { $$(sel + ' button').forEach(b => b.addEventListener('click', () => { $$(sel + ' button').forEach(x => x.classList.remove('on')); b.classList.add('on'); })); });
     const del = $('#recDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this template?')) return;
@@ -2519,62 +2334,32 @@ const monthlyState = { month: todayISO().slice(0,7), week: todayISO() };
 
 function renderFilterBar () {
   const skipDate = (currentReport === 'recurring' || currentReport === 'monthly' || currentReport === 'weekly');
-  if (skipDate) {
-    $('#filterRow').innerHTML = '';
-    $('#customDateRow').classList.remove('on');
-    renderMonthNav();
-    return;
-  }
+  if (skipDate) { $('#filterRow').innerHTML = ''; $('#customDateRow').classList.remove('on'); renderMonthNav(); return; }
   $('#monthNavWrap').innerHTML = '';
-  const presets = [
-    { k: 'today', l: 'Today' }, { k: 'yesterday', l: 'Yesterday' },
-    { k: '7d', l: '7 days' }, { k: '30d', l: '30 days' },
-    { k: 'month', l: 'This month' }, { k: 'last_month', l: 'Last month' }, { k: 'all', l: 'All time' },
-  ];
+  const presets = [ { k: 'today', l: 'Today' }, { k: 'yesterday', l: 'Yesterday' }, { k: '7d', l: '7 days' }, { k: '30d', l: '30 days' }, { k: 'month', l: 'This month' }, { k: 'last_month', l: 'Last month' }, { k: 'all', l: 'All time' } ];
   const isPreset = filterState.dateType === 'preset';
   const isCustom = filterState.dateType === 'custom';
-  $('#filterRow').innerHTML =
-    presets.map(p => `<button class="filter-chip ${isPreset && filterState.preset === p.k ? 'on' : ''}" data-preset="${p.k}">${p.l}</button>`).join('') +
-    `<button class="filter-chip ${isCustom ? 'on' : ''}" data-preset="custom">📅 Custom</button>`;
+  $('#filterRow').innerHTML = presets.map(p => `<button class="filter-chip ${isPreset && filterState.preset === p.k ? 'on' : ''}" data-preset="${p.k}">${p.l}</button>`).join('') + `<button class="filter-chip ${isCustom ? 'on' : ''}" data-preset="custom">📅 Custom</button>`;
   $$('#filterRow [data-preset]').forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.preset;
-    if (v === 'custom') {
-      filterState.dateType = 'custom';
-      if (!filterState.from) filterState.from = todayISO();
-      if (!filterState.to) filterState.to = todayISO();
-    } else { filterState.dateType = 'preset'; filterState.preset = v; }
+    if (v === 'custom') { filterState.dateType = 'custom'; if (!filterState.from) filterState.from = todayISO(); if (!filterState.to) filterState.to = todayISO(); }
+    else { filterState.dateType = 'preset'; filterState.preset = v; }
     renderFilterBar(); renderCustomDateRow(); renderActiveFilters(); renderReportContent();
   }));
   const row = $('#customDateRow');
-  if (isCustom) {
-    row.classList.add('on');
-    const f = $('#filterFrom'); if (f) f.value = filterState.from || todayISO();
-    const t = $('#filterTo');   if (t) t.value = filterState.to   || todayISO();
-  } else row.classList.remove('on');
+  if (isCustom) { row.classList.add('on'); const f = $('#filterFrom'); if (f) f.value = filterState.from || todayISO(); const t = $('#filterTo'); if (t) t.value = filterState.to || todayISO(); }
+  else row.classList.remove('on');
   attachRipple();
 }
 function renderMonthNav () {
-  const wrap = $('#monthNavWrap');
-  if (!wrap) return;
+  const wrap = $('#monthNavWrap'); if (!wrap) return;
   if (currentReport === 'monthly') {
     const [y, m] = monthlyState.month.split('-').map(Number);
     const label = new Date(y, m-1, 1).toLocaleDateString('en-IN', { month:'long', year:'numeric' });
-    wrap.innerHTML = `<div class="month-nav">
-      <button id="mnPrev">‹</button>
-      <div class="mn-lbl">${label}</div>
-      <button id="mnNext">›</button>
-    </div>`;
+    wrap.innerHTML = `<div class="month-nav"><button id="mnPrev">‹</button><div class="mn-lbl">${label}</div><button id="mnNext">›</button></div>`;
     setTimeout(() => {
-      $('#mnPrev').addEventListener('click', () => {
-        const d = new Date(y, m-2, 1);
-        monthlyState.month = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-        renderMonthNav(); renderReportContent();
-      });
-      $('#mnNext').addEventListener('click', () => {
-        const d = new Date(y, m, 1);
-        monthlyState.month = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-        renderMonthNav(); renderReportContent();
-      });
+      $('#mnPrev').addEventListener('click', () => { const d = new Date(y, m-2, 1); monthlyState.month = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); renderMonthNav(); renderReportContent(); });
+      $('#mnNext').addEventListener('click', () => { const d = new Date(y, m, 1); monthlyState.month = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); renderMonthNav(); renderReportContent(); });
     }, 30);
   } else if (currentReport === 'weekly') {
     const anchor = new Date(monthlyState.week + 'T00:00:00');
@@ -2583,22 +2368,10 @@ function renderMonthNav () {
     const mon = new Date(anchor); mon.setDate(anchor.getDate() + monOff);
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
     const label = dateDisplay(isoLocal(mon)) + ' → ' + dateDisplay(isoLocal(sun));
-    wrap.innerHTML = `<div class="month-nav">
-      <button id="wkPrev">‹</button>
-      <div class="mn-lbl">${label}</div>
-      <button id="wkNext">›</button>
-    </div>`;
+    wrap.innerHTML = `<div class="month-nav"><button id="wkPrev">‹</button><div class="mn-lbl">${label}</div><button id="wkNext">›</button></div>`;
     setTimeout(() => {
-      $('#wkPrev').addEventListener('click', () => {
-        const d = new Date(anchor); d.setDate(d.getDate()-7);
-        monthlyState.week = isoLocal(d);
-        renderMonthNav(); renderReportContent();
-      });
-      $('#wkNext').addEventListener('click', () => {
-        const d = new Date(anchor); d.setDate(d.getDate()+7);
-        monthlyState.week = isoLocal(d);
-        renderMonthNav(); renderReportContent();
-      });
+      $('#wkPrev').addEventListener('click', () => { const d = new Date(anchor); d.setDate(d.getDate()-7); monthlyState.week = isoLocal(d); renderMonthNav(); renderReportContent(); });
+      $('#wkNext').addEventListener('click', () => { const d = new Date(anchor); d.setDate(d.getDate()+7); monthlyState.week = isoLocal(d); renderMonthNav(); renderReportContent(); });
     }, 30);
   } else wrap.innerHTML = '';
 }
@@ -2611,8 +2384,7 @@ function renderCustomDateRow () {
   t.onchange = () => { filterState.to = t.value || todayISO(); renderActiveFilters(); renderReportContent(); };
 }
 function renderActiveFilters () {
-  const strip = $('#activeFilterStrip');
-  if (!strip) return;
+  const strip = $('#activeFilterStrip'); if (!strip) return;
   if (currentReport === 'recurring' || currentReport === 'monthly' || currentReport === 'weekly') { strip.innerHTML = ''; return; }
   const { from, to } = resolveDateRange();
   strip.innerHTML = `<span>📅 <b>${from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to)}</b></span>`;
@@ -2622,12 +2394,7 @@ let currentReport = null;
 function openReport (id) {
   if (id === 'pnl' && !isAccount()) { toast('Account access only', {success:false}); return; }
   currentReport = id;
-  const titles = {
-    monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet', staffhours:'Staff Hours',
-    expense:'Expense Report', recurring:'Recurring Expenses', daily:'Daily Production',
-    operator:'Operator Report', bundle:'Bundle Report', operation:'Operation Report',
-    pnl:'Profit & Loss', advance:'Advance Ledger',
-  };
+  const titles = { monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet', staffhours:'Staff Hours', expense:'Expense Report', recurring:'Recurring Expenses', daily:'Daily Production', operator:'Operator Report', bundle:'Bundle Report', operation:'Operation Report', pnl:'Profit & Loss', advance:'Advance Ledger' };
   nav('reportDetail', { title: titles[id] || 'Report' });
 }
 function openReportSalary () { openReport('salary'); }
@@ -2642,9 +2409,7 @@ window.openReportAdvance = openReportAdvance;
 
 function renderReportDetail () {
   if (!currentReport) return;
-  renderFilterBar();
-  renderActiveFilters();
-  renderReportContent();
+  renderFilterBar(); renderActiveFilters(); renderReportContent();
 }
 window.renderReportDetail = renderReportDetail;
 
@@ -2672,12 +2437,12 @@ function renderReportContent () {
   const exps = applyExpenseFilters(DB.expenses);
   const { from, to } = resolveDateRange();
   const hours = DB.staffHours.filter(h => h.date >= from && h.date <= to);
-  if (id === 'salary')       content.innerHTML = buildSalaryReport(rows, from, to);
+  if (id === 'salary') content.innerHTML = buildSalaryReport(rows, from, to);
   else if (id === 'staffhours') content.innerHTML = buildStaffHoursReport(hours, from, to);
   else if (id === 'expense') content.innerHTML = buildExpenseReport(exps);
-  else if (id === 'daily')   content.innerHTML = buildDailyReport(rows);
+  else if (id === 'daily') content.innerHTML = buildDailyReport(rows);
   else if (id === 'operator') content.innerHTML = buildOperatorReport(rows);
-  else if (id === 'bundle')  content.innerHTML = buildBundleReport(rows);
+  else if (id === 'bundle') content.innerHTML = buildBundleReport(rows);
   else if (id === 'operation') content.innerHTML = buildOperationReport(rows);
   attachRipple();
 }
@@ -2692,18 +2457,11 @@ function buildAdvanceLedger () {
   const byPerson = {};
   DB.advances.forEach(a => {
     const key = a.personType + ':' + a.personId;
-    if (!byPerson[key]) byPerson[key] = {
-      personType: a.personType, personId: a.personId, personName: a.personName,
-      entries: [], outstanding: 0, total: 0,
-    };
-    byPerson[key].entries.push(a);
-    byPerson[key].total += a.amount;
+    if (!byPerson[key]) byPerson[key] = { personType: a.personType, personId: a.personId, personName: a.personName, entries: [], outstanding: 0, total: 0 };
+    byPerson[key].entries.push(a); byPerson[key].total += a.amount;
     if (!a.settled) byPerson[key].outstanding += a.amount;
   });
-  const list = Object.values(byPerson).sort((a,b) => {
-    if (a.outstanding !== b.outstanding) return b.outstanding - a.outstanding;
-    return b.total - a.total;
-  });
+  const list = Object.values(byPerson).sort((a,b) => { if (a.outstanding !== b.outstanding) return b.outstanding - a.outstanding; return b.total - a.total; });
   const unsettledPeople = list.filter(p => p.outstanding > 0).length;
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#DC2626,#EF4444)">
@@ -2722,23 +2480,15 @@ function buildAdvanceLedger () {
 function renderAdvancePersonCard (p, from, to) {
   const periodAmt = p.entries.filter(a => a.date >= from && a.date <= to).reduce((s, a) => s + a.amount, 0);
   const typeLabel = p.personType === 'operator' ? 'Operator' : 'Company Staff';
-  const badge = p.outstanding > 0
-    ? `<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">OUTSTANDING</span>`
-    : `<span style="background:var(--emerald-lt);color:var(--emerald-dk);padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">CLEARED</span>`;
+  const badge = p.outstanding > 0 ? `<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">OUTSTANDING</span>` : `<span style="background:var(--emerald-lt);color:var(--emerald-dk);padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">CLEARED</span>`;
   const sortedEntries = [...p.entries].sort((a,b) => b.date.localeCompare(a.date));
   return `
     <div class="salary-section">
       <div class="salary-emp" onclick="this.classList.toggle('expanded')">
         <div class="se-top">
           <div class="se-av" style="background:linear-gradient(135deg,#DC2626,#EF4444)">${initials(p.personName)}</div>
-          <div class="se-body">
-            <div class="se-name">${escapeHtml(p.personName)}</div>
-            <div class="se-info">${typeLabel} · ${p.entries.length} entr${p.entries.length === 1 ? 'y' : 'ies'}${periodAmt > 0 ? ' · ' + money(periodAmt) + ' in period' : ''}</div>
-          </div>
-          <div class="se-amt">
-            <div class="se-net" style="color:${p.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(p.outstanding)}</div>
-            <div class="se-gross">${badge}</div>
-          </div>
+          <div class="se-body"><div class="se-name">${escapeHtml(p.personName)}</div><div class="se-info">${typeLabel} · ${p.entries.length} entr${p.entries.length === 1 ? 'y' : 'ies'}${periodAmt > 0 ? ' · ' + money(periodAmt) + ' in period' : ''}</div></div>
+          <div class="se-amt"><div class="se-net" style="color:${p.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(p.outstanding)}</div><div class="se-gross">${badge}</div></div>
           <svg class="se-arrow"><use href="#i-chev-down"/></svg>
         </div>
         <div class="se-ops">
@@ -2750,36 +2500,22 @@ function renderAdvancePersonCard (p, from, to) {
                 <button type="button" class="adv-set-chip ${a.settled ? 'on' : 'out'}" onclick="event.stopPropagation();toggleAdvanceSettled('${a.id}')">${a.settled ? '✓ SETTLED' : 'OUTSTANDING'}</button>
                 <button type="button" onclick="event.stopPropagation();deleteAdvance('${a.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(220,38,38,.1);color:var(--red);display:grid;place-items:center;font-size:14px;border:none;cursor:pointer">×</button>
               </span>
-            </div>
-          `).join('')}
+            </div>`).join('')}
           <div class="op-line op-tot"><span>Total advances</span><span>${money(p.total)}</span></div>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 function buildMonthlyGrid () {
   const month = monthlyState.month || todayISO().slice(0,7);
   const [y, m] = month.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
-  const days = Array.from({ length: daysInMonth }, (_, i) => {
-    const d = new Date(y, m-1, i+1);
-    return { day: i+1, date: isoLocal(d), dow: d.getDay() };
-  });
+  const days = Array.from({ length: daysInMonth }, (_, i) => { const d = new Date(y, m-1, i+1); return { day: i+1, date: isoLocal(d), dow: d.getDay() }; });
   const prodByEmp = {}, piecesByEmp = {};
-  DB.production.forEach(p => {
-    if (p.date.slice(0,7) !== month) return;
-    if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {};
-    prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0);
-    piecesByEmp[p.empId] = (piecesByEmp[p.empId] || 0) + p.qty;
-  });
+  DB.production.forEach(p => { if (p.date.slice(0,7) !== month) return; if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {}; prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0); piecesByEmp[p.empId] = (piecesByEmp[p.empId] || 0) + p.qty; });
   const staffByRow = {};
-  DB.staffHours.forEach(h => {
-    if (h.date.slice(0,7) !== month) return;
-    if (!staffByRow[h.staffId]) staffByRow[h.staffId] = {};
-    staffByRow[h.staffId][h.date] = (staffByRow[h.staffId][h.date] || 0) + (Number(h.amount) || 0);
-  });
+  DB.staffHours.forEach(h => { if (h.date.slice(0,7) !== month) return; if (!staffByRow[h.staffId]) staffByRow[h.staffId] = {}; staffByRow[h.staffId][h.date] = (staffByRow[h.staffId][h.date] || 0) + (Number(h.amount) || 0); });
   const operatorTotal = Object.values(prodByEmp).reduce((acc, byDate) => acc + Object.values(byDate).reduce((a,b) => a+b, 0), 0);
   const staffTotal = Object.values(staffByRow).reduce((acc, byDate) => acc + Object.values(byDate).reduce((a,b) => a+b, 0), 0);
   const grandTotal = operatorTotal + staffTotal;
@@ -2788,12 +2524,7 @@ function buildMonthlyGrid () {
   const operatorRows = DB.employees.map(emp => {
     const byDate = prodByEmp[emp.id] || {};
     let rowTotal = 0;
-    const cells = days.map(d => {
-      const amt = byDate[d.date] || 0;
-      const wknd = (d.dow===0||d.dow===6)?'weekend-col':'';
-      if (amt > 0) { rowTotal += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; }
-      return `<td class="zero ${wknd}">–</td>`;
-    }).join('');
+    const cells = days.map(d => { const amt = byDate[d.date] || 0; const wknd = (d.dow===0||d.dow===6)?'weekend-col':''; if (amt > 0) { rowTotal += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; } return `<td class="zero ${wknd}">–</td>`; }).join('');
     const pcs = piecesByEmp[emp.id] || 0;
     if (rowTotal === 0 && pcs === 0) return '';
     return `<tr><td>${escapeHtml(emp.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">${pcs} pcs</div></td>${cells}<td class="grid-total-col">₹${Math.round(rowTotal).toLocaleString('en-IN')}</td></tr>`;
@@ -2801,18 +2532,11 @@ function buildMonthlyGrid () {
   const staffRows = DB.companyStaff.map(s => {
     const byDate = staffByRow[s.id] || {};
     let rowTotal = 0;
-    const cells = days.map(d => {
-      const amt = byDate[d.date] || 0;
-      const wknd = (d.dow===0||d.dow===6)?'weekend-col':'';
-      if (amt > 0) { rowTotal += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; }
-      return `<td class="zero ${wknd}">–</td>`;
-    }).join('');
+    const cells = days.map(d => { const amt = byDate[d.date] || 0; const wknd = (d.dow===0||d.dow===6)?'weekend-col':''; if (amt > 0) { rowTotal += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; } return `<td class="zero ${wknd}">–</td>`; }).join('');
     if (rowTotal === 0) return '';
     return `<tr><td><span style="color:var(--purple)">👤 ${escapeHtml(s.name)}</span><div style="font-size:9px;color:var(--text-3);font-weight:500">${escapeHtml(s.role||'')}</div></td>${cells}<td class="grid-total-col">₹${Math.round(rowTotal).toLocaleString('en-IN')}</td></tr>`;
   }).join('');
-  if (!operatorRows && !staffRows) {
-    return emptyState('i-grid', 'No data for ' + month, 'No production or hours logged this month.');
-  }
+  if (!operatorRows && !staffRows) return emptyState('i-grid', 'No data for ' + month, 'No production or hours logged this month.');
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">
       <div class="rh-l">Monthly Total · ${month}</div>
@@ -2829,8 +2553,7 @@ function buildMonthlyGrid () {
         <thead><tr><th>Name</th>${headCols}<th style="background:linear-gradient(180deg,#ECFDF5,#D1FAE5);color:#065F46">Total</th></tr></thead>
         <tbody>${operatorRows}${staffRows}</tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
 function buildWeeklyGrid () {
@@ -2838,22 +2561,11 @@ function buildWeeklyGrid () {
   const dow = anchor.getDay();
   const monOff = dow === 0 ? -6 : 1 - dow;
   const mon = new Date(anchor); mon.setDate(anchor.getDate() + monOff);
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mon); d.setDate(mon.getDate() + i);
-    return { date: isoLocal(d), dow: d.getDay(), label: d.toLocaleDateString('en-IN', { weekday:'short' }), day: d.getDate() };
-  });
+  const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return { date: isoLocal(d), dow: d.getDay(), label: d.toLocaleDateString('en-IN', { weekday:'short' }), day: d.getDate() }; });
   const from = weekDays[0].date, to = weekDays[6].date;
   const prodByEmp = {}, staffByRow = {};
-  DB.production.forEach(p => {
-    if (p.date < from || p.date > to) return;
-    if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {};
-    prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0);
-  });
-  DB.staffHours.forEach(h => {
-    if (h.date < from || h.date > to) return;
-    if (!staffByRow[h.staffId]) staffByRow[h.staffId] = {};
-    staffByRow[h.staffId][h.date] = (staffByRow[h.staffId][h.date] || 0) + (Number(h.amount) || 0);
-  });
+  DB.production.forEach(p => { if (p.date < from || p.date > to) return; if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {}; prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0); });
+  DB.staffHours.forEach(h => { if (h.date < from || h.date > to) return; if (!staffByRow[h.staffId]) staffByRow[h.staffId] = {}; staffByRow[h.staffId][h.date] = (staffByRow[h.staffId][h.date] || 0) + (Number(h.amount) || 0); });
   const operatorTotal = Object.values(prodByEmp).reduce((a, d) => a + Object.values(d).reduce((x,y) => x+y, 0), 0);
   const staffTotal = Object.values(staffByRow).reduce((a, d) => a + Object.values(d).reduce((x,y) => x+y, 0), 0);
   const grandTotal = operatorTotal + staffTotal;
@@ -2861,30 +2573,18 @@ function buildWeeklyGrid () {
   const opRows = DB.employees.map(emp => {
     const byDate = prodByEmp[emp.id] || {};
     let total = 0;
-    const cells = weekDays.map(d => {
-      const amt = byDate[d.date] || 0;
-      const wknd = (d.dow===0||d.dow===6)?'weekend-col':'';
-      if (amt > 0) { total += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; }
-      return `<td class="zero ${wknd}">–</td>`;
-    }).join('');
+    const cells = weekDays.map(d => { const amt = byDate[d.date] || 0; const wknd = (d.dow===0||d.dow===6)?'weekend-col':''; if (amt > 0) { total += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; } return `<td class="zero ${wknd}">–</td>`; }).join('');
     if (total === 0) return '';
     return `<tr><td>${escapeHtml(emp.name)}</td>${cells}<td class="grid-total-col">₹${Math.round(total).toLocaleString('en-IN')}</td></tr>`;
   }).join('');
   const stRows = DB.companyStaff.map(s => {
     const byDate = staffByRow[s.id] || {};
     let total = 0;
-    const cells = weekDays.map(d => {
-      const amt = byDate[d.date] || 0;
-      const wknd = (d.dow===0||d.dow===6)?'weekend-col':'';
-      if (amt > 0) { total += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; }
-      return `<td class="zero ${wknd}">–</td>`;
-    }).join('');
+    const cells = weekDays.map(d => { const amt = byDate[d.date] || 0; const wknd = (d.dow===0||d.dow===6)?'weekend-col':''; if (amt > 0) { total += amt; return `<td class="has-val ${wknd}">${Math.round(amt)}</td>`; } return `<td class="zero ${wknd}">–</td>`; }).join('');
     if (total === 0) return '';
     return `<tr><td><span style="color:var(--purple)">👤 ${escapeHtml(s.name)}</span></td>${cells}<td class="grid-total-col">₹${Math.round(total).toLocaleString('en-IN')}</td></tr>`;
   }).join('');
-  if (!opRows && !stRows) {
-    return emptyState('i-cal', 'No data this week', dateDisplay(from) + ' → ' + dateDisplay(to));
-  }
+  if (!opRows && !stRows) return emptyState('i-cal', 'No data this week', dateDisplay(from) + ' → ' + dateDisplay(to));
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#2563EB,#3B82F6)">
       <div class="rh-l">Week Total</div>
@@ -2900,8 +2600,7 @@ function buildWeeklyGrid () {
         <thead><tr><th>Name</th>${headCols}<th style="background:linear-gradient(180deg,#ECFDF5,#D1FAE5);color:#065F46">Total</th></tr></thead>
         <tbody>${opRows}${stRows}</tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
 function buildPnlReport () {
@@ -2909,28 +2608,14 @@ function buildPnlReport () {
   const { from, to } = resolveDateRange();
   if (!s.rows.length && !s.expenses.length) return emptyState('i-pnl', 'No data', 'No production or expenses in this range.');
   const byDay = {};
-  s.rows.forEach(r => {
-    byDay[r.date] = byDay[r.date] || { rev:0, wage:0, exp:0 };
-    byDay[r.date].rev  += entryRevenue(r);
-    byDay[r.date].wage += entryCost(r);
-  });
-  s.expenses.forEach(e => {
-    byDay[e.date] = byDay[e.date] || { rev:0, wage:0, exp:0 };
-    byDay[e.date].exp += Number(e.amount || 0);
-  });
+  s.rows.forEach(r => { byDay[r.date] = byDay[r.date] || { rev:0, wage:0, exp:0 }; byDay[r.date].rev += entryRevenue(r); byDay[r.date].wage += entryCost(r); });
+  s.expenses.forEach(e => { byDay[e.date] = byDay[e.date] || { rev:0, wage:0, exp:0 }; byDay[e.date].exp += Number(e.amount || 0); });
   const days = Object.keys(byDay).sort().reverse();
   const dayRows = days.map(d => {
-    const row = byDay[d];
-    const net = row.rev - row.wage - row.exp;
+    const row = byDay[d]; const net = row.rev - row.wage - row.exp;
     const cls = net > 0 ? 'has-val' : (net < 0 ? '' : 'zero');
     const stl = net < 0 ? 'background:rgba(220,38,38,.1);color:#B91C1C;font-weight:700' : '';
-    return `<tr>
-      <td>${dateShort(d)}</td>
-      <td>₹${Math.round(row.rev).toLocaleString('en-IN')}</td>
-      <td>₹${Math.round(row.wage).toLocaleString('en-IN')}</td>
-      <td>₹${Math.round(row.exp).toLocaleString('en-IN')}</td>
-      <td class="${cls}" style="${stl}">₹${Math.round(net).toLocaleString('en-IN')}</td>
-    </tr>`;
+    return `<tr><td>${dateShort(d)}</td><td>₹${Math.round(row.rev).toLocaleString('en-IN')}</td><td>₹${Math.round(row.wage).toLocaleString('en-IN')}</td><td>₹${Math.round(row.exp).toLocaleString('en-IN')}</td><td class="${cls}" style="${stl}">₹${Math.round(net).toLocaleString('en-IN')}</td></tr>`;
   }).join('');
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,${s.net >= 0 ? '#059669,#10B981' : '#DC2626,#EF4444'})">
@@ -2941,31 +2626,17 @@ function buildPnlReport () {
     <div class="pnl-card rev"><div class="pcl">Revenue</div><div class="pcv">${money(s.revenue)}</div><div class="pcs">${s.pieces} pieces produced</div></div>
     <div class="pnl-card wage"><div class="pcl">Operator Wages</div><div class="pcv">${money(s.cost)}</div><div class="pcs">${s.rows.length} entries</div></div>
     <div class="pnl-card exp"><div class="pcl">Expenses</div><div class="pcv">${money(s.expenseTotal)}</div><div class="pcs">${s.expenses.length} entries</div></div>
-    <div class="pnl-card net ${s.net < 0 ? 'neg' : ''}">
-      <div class="pcl">Net Profit</div><div class="pcv">${money(s.net)}</div>
-      <div class="pcs">${s.margin.toFixed(1)}% margin on revenue</div>
-    </div>
+    <div class="pnl-card net ${s.net < 0 ? 'neg' : ''}"><div class="pcl">Net Profit</div><div class="pcv">${money(s.net)}</div><div class="pcs">${s.margin.toFixed(1)}% margin on revenue</div></div>
     <div class="sec-hd" style="padding:16px 20px 8px">Day-by-Day</div>
     <div class="grid-scroll">
-      <table class="grid-table">
-        <thead><tr><th>Date</th><th>Revenue</th><th>Wages</th><th>Expenses</th><th>Net</th></tr></thead>
-        <tbody>${dayRows}</tbody>
-      </table>
-    </div>
-  `;
+      <table class="grid-table"><thead><tr><th>Date</th><th>Revenue</th><th>Wages</th><th>Expenses</th><th>Net</th></tr></thead><tbody>${dayRows}</tbody></table>
+    </div>`;
 }
 
 function buildRecurringReport () {
-  if (!DB.recurring.length) {
-    return `<div class="empty"><div class="eic">${icon('i-repeat')}</div><h4>No recurring expenses</h4><p>Set up daily, weekly, or monthly expenses.</p><button class="btn primary sm" style="margin:0 auto" id="addRecurBtn2">${icon('i-plus')} Add Recurring</button></div>`;
-  }
+  if (!DB.recurring.length) return `<div class="empty"><div class="eic">${icon('i-repeat')}</div><h4>No recurring expenses</h4><p>Set up daily, weekly, or monthly expenses.</p><button class="btn primary sm" style="margin:0 auto" id="addRecurBtn2">${icon('i-plus')} Add Recurring</button></div>`;
   const activeCount = DB.recurring.filter(r => r.active).length;
-  const dailyCost = DB.recurring.filter(r => r.active).reduce((a,r) => {
-    if (r.frequency === 'daily') return a + r.amount;
-    if (r.frequency === 'weekly') return a + r.amount / 7;
-    if (r.frequency === 'monthly') return a + r.amount / 30;
-    return a;
-  }, 0);
+  const dailyCost = DB.recurring.filter(r => r.active).reduce((a,r) => { if (r.frequency === 'daily') return a + r.amount; if (r.frequency === 'weekly') return a + r.amount / 7; if (r.frequency === 'monthly') return a + r.amount / 30; return a; }, 0);
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#DB2777,#F472B6)">
       <div class="rh-l">Active Templates</div>
@@ -2981,15 +2652,10 @@ function buildRecurringReport () {
             <div style="font-size:14px;font-weight:700">${escapeHtml(r.category)} <span class="recur-chip ${r.active?'':'off'}">${r.active?'ON':'OFF'}</span></div>
             <div style="font-size:11.5px;color:var(--text-3);font-weight:500;margin-top:2px">${escapeHtml(nextRunHint(r))}${r.note ? ' · ' + escapeHtml(r.note) : ''}</div>
           </div>
-          <div style="text-align:right;flex-shrink:0">
-            <div style="font-size:15px;font-weight:800;color:var(--orange)">${money(r.amount)}</div>
-            <div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">${escapeHtml(r.frequency)}</div>
-          </div>
+          <div style="text-align:right;flex-shrink:0"><div style="font-size:15px;font-weight:800;color:var(--orange)">${money(r.amount)}</div><div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">${escapeHtml(r.frequency)}</div></div>
         </div>
-      </div>
-    `).join('')}
-    <div style="padding:8px 16px 4px"><button class="btn primary" id="addRecurBtn2">${icon('i-plus')} Add Recurring</button></div>
-  `;
+      </div>`).join('')}
+    <div style="padding:8px 16px 4px"><button class="btn primary" id="addRecurBtn2">${icon('i-plus')} Add Recurring</button></div>`;
 }
 
 function buildSalaryReport (rows, from, to) {
@@ -2997,9 +2663,7 @@ function buildSalaryReport (rows, from, to) {
   const byEmp = {};
   rows.forEach(r => {
     if (!byEmp[r.empId]) byEmp[r.empId] = { id:r.empId, name:r.operatorName || '—', line:r.line || '', pieces:0, wages:0, rejects:0, ops:{} };
-    byEmp[r.empId].pieces += r.qty;
-    byEmp[r.empId].wages += Number(r.amount) || 0;
-    byEmp[r.empId].rejects += r.reject || 0;
+    byEmp[r.empId].pieces += r.qty; byEmp[r.empId].wages += Number(r.amount) || 0; byEmp[r.empId].rejects += r.reject || 0;
     byEmp[r.empId].ops[r.operation] = (byEmp[r.empId].ops[r.operation] || 0) + r.qty;
   });
   const list = Object.values(byEmp).sort((a,b) => b.wages - a.wages);
@@ -3027,32 +2691,21 @@ function buildSalaryReport (rows, from, to) {
               <svg class="se-arrow"><use href="#i-chev-down"/></svg>
             </div>
             <div class="se-ops">
-              ${Object.entries(emp.ops).map(([op, qty]) => {
-                const opRows = rows.filter(r => r.empId === emp.id && r.operation === op);
-                const opWages = opRows.reduce((a,b) => a + (Number(b.amount)||0), 0);
-                return `<div class="op-line"><span>${escapeHtml(op)} · ${qty} pcs</span><span>${money(opWages)}</span></div>`;
-              }).join('')}
+              ${Object.entries(emp.ops).map(([op, qty]) => { const opRows = rows.filter(r => r.empId === emp.id && r.operation === op); const opWages = opRows.reduce((a,b) => a + (Number(b.amount)||0), 0); return `<div class="op-line"><span>${escapeHtml(op)} · ${qty} pcs</span><span>${money(opWages)}</span></div>`; }).join('')}
               <div class="op-line op-tot"><span>Total wages</span><span>${money(emp.wages)}</span></div>
               ${advInPeriod > 0 ? `<div class="op-line" style="color:#991B1B"><span>Advance this period</span><span>-${money(advInPeriod)}</span></div>` : ''}
               ${advOut > 0 ? `<div class="op-line" style="color:#991B1B"><span>Outstanding advance</span><span>${money(advOut)}</span></div>` : ''}
               <div class="op-line op-tot" style="color:var(--emerald-dk);border-top:2px solid var(--emerald-lt)"><span>Net payable</span><span>${money(netPayable)}</span></div>
             </div>
           </div>
-        </div>
-      `;
-    }).join('')}
-  `;
+        </div>`;
+    }).join('')}`;
 }
 
 function buildStaffHoursReport (hours, from, to) {
   if (!hours.length) return emptyState('i-clock', 'No staff hours', 'No staff hours logged in this range.');
   const byStaff = {};
-  hours.forEach(h => {
-    if (!byStaff[h.staffId]) byStaff[h.staffId] = { id:h.staffId, name:h.staffName, hours:0, amount:0, hourlyRate:h.hourlyRate, days:[] };
-    byStaff[h.staffId].hours += Number(h.hours) || 0;
-    byStaff[h.staffId].amount += Number(h.amount) || 0;
-    byStaff[h.staffId].days.push(h);
-  });
+  hours.forEach(h => { if (!byStaff[h.staffId]) byStaff[h.staffId] = { id:h.staffId, name:h.staffName, hours:0, amount:0, hourlyRate:h.hourlyRate, days:[] }; byStaff[h.staffId].hours += Number(h.hours) || 0; byStaff[h.staffId].amount += Number(h.amount) || 0; byStaff[h.staffId].days.push(h); });
   const list = Object.values(byStaff).sort((a,b) => b.amount - a.amount);
   const totalHrs = list.reduce((a,b) => a + b.hours, 0);
   const totalAmt = list.reduce((a,b) => a + b.amount, 0);
@@ -3079,19 +2732,15 @@ function buildStaffHoursReport (hours, from, to) {
               <svg class="se-arrow"><use href="#i-chev-down"/></svg>
             </div>
             <div class="se-ops">
-              ${[...emp.days].sort((a,b) => a.date.localeCompare(b.date)).map(d => `
-                <div class="op-line"><span>${dateShort(d.date)} · ${d.hours}h × ₹${d.hourlyRate.toFixed(2)}</span><span>${money(d.amount)}</span></div>
-              `).join('')}
+              ${[...emp.days].sort((a,b) => a.date.localeCompare(b.date)).map(d => `<div class="op-line"><span>${dateShort(d.date)} · ${d.hours}h × ₹${d.hourlyRate.toFixed(2)}</span><span>${money(d.amount)}</span></div>`).join('')}
               <div class="op-line op-tot"><span>Total wages</span><span>${money(emp.amount)}</span></div>
               ${advInPeriod > 0 ? `<div class="op-line" style="color:#991B1B"><span>Advance this period</span><span>-${money(advInPeriod)}</span></div>` : ''}
               ${advOut > 0 ? `<div class="op-line" style="color:#991B1B"><span>Outstanding advance</span><span>${money(advOut)}</span></div>` : ''}
               <div class="op-line op-tot" style="color:var(--emerald-dk);border-top:2px solid var(--emerald-lt)"><span>Net payable</span><span>${money(netPayable)}</span></div>
             </div>
           </div>
-        </div>
-      `;
-    }).join('')}
-  `;
+        </div>`;
+    }).join('')}`;
 }
 
 function buildExpenseReport (exps) {
@@ -3109,39 +2758,20 @@ function buildExpenseReport (exps) {
     </div>
     <div class="sec-hd" style="padding:8px 20px 6px">By Category</div>
     <div class="grid-scroll">
-      <table class="grid-table">
-        <thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
-        <tbody>${sorted.map(([cat, amt]) => `
-          <tr><td>${escapeHtml(cat)}</td><td>₹${Math.round(amt).toLocaleString('en-IN')}</td><td>${total > 0 ? ((amt/total)*100).toFixed(0) : 0}%</td></tr>
-        `).join('')}</tbody>
+      <table class="grid-table"><thead><tr><th>Category</th><th>Amount</th><th>%</th></tr></thead>
+        <tbody>${sorted.map(([cat, amt]) => `<tr><td>${escapeHtml(cat)}</td><td>₹${Math.round(amt).toLocaleString('en-IN')}</td><td>${total > 0 ? ((amt/total)*100).toFixed(0) : 0}%</td></tr>`).join('')}</tbody>
       </table>
     </div>
     <div class="sec-hd" style="padding:16px 20px 6px">All Transactions</div>
     <div class="report-table" style="padding:0">
-      ${sortedTx.map(e => `
-        <div class="expense-list-item" onclick="openExpense('${e.id}')">
-          <div class="eli-ic" style="${e.auto ? 'background:linear-gradient(135deg,#0F766E,#14B8A6)' : ''}">${icon(e.auto ? 'i-repeat' : 'i-expense')}</div>
-          <div class="eli-body">
-            <div class="eli-t">${escapeHtml(e.category)}${e.auto ? ' <span class="recur-chip" style="font-size:9px">AUTO</span>' : ''}</div>
-            <div class="eli-s">${dateShort(e.date)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</div>
-          </div>
-          <div class="eli-amt">${money(e.amount)}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+      ${sortedTx.map(e => `<div class="expense-list-item" onclick="openExpense('${e.id}')"><div class="eli-ic" style="${e.auto ? 'background:linear-gradient(135deg,#0F766E,#14B8A6)' : ''}">${icon(e.auto ? 'i-repeat' : 'i-expense')}</div><div class="eli-body"><div class="eli-t">${escapeHtml(e.category)}${e.auto ? ' <span class="recur-chip" style="font-size:9px">AUTO</span>' : ''}</div><div class="eli-s">${dateShort(e.date)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</div></div><div class="eli-amt">${money(e.amount)}</div></div>`).join('')}
+    </div>`;
 }
 
 function buildDailyReport (rows) {
   if (!rows.length) return emptyState('i-cal', 'No production', 'No production entries in this range.');
   const byDay = {};
-  rows.forEach(r => {
-    if (!byDay[r.date]) byDay[r.date] = { pieces:0, rejects:0, wages:0, entries:0 };
-    byDay[r.date].pieces += r.qty;
-    byDay[r.date].rejects += r.reject || 0;
-    byDay[r.date].wages += Number(r.amount) || 0;
-    byDay[r.date].entries += 1;
-  });
+  rows.forEach(r => { if (!byDay[r.date]) byDay[r.date] = { pieces:0, rejects:0, wages:0, entries:0 }; byDay[r.date].pieces += r.qty; byDay[r.date].rejects += r.reject || 0; byDay[r.date].wages += Number(r.amount) || 0; byDay[r.date].entries += 1; });
   const days = Object.keys(byDay).sort().reverse();
   const totalPieces = days.reduce((a,d) => a + byDay[d].pieces, 0);
   const totalWages = days.reduce((a,d) => a + byDay[d].wages, 0);
@@ -3153,25 +2783,16 @@ function buildDailyReport (rows) {
       <div class="rh-s">${days.length} day${days.length>1?'s':''} · ${money(totalWages)} wages · ${totalRej} rejects</div>
     </div>
     <div class="grid-scroll">
-      <table class="grid-table">
-        <thead><tr><th>Date</th><th>Pieces</th><th>Rejects</th><th>Wages</th></tr></thead>
-        <tbody>${days.map(d => `
-          <tr><td>${dateShort(d)}</td><td>${byDay[d].pieces}</td><td>${byDay[d].rejects}</td><td>₹${Math.round(byDay[d].wages).toLocaleString('en-IN')}</td></tr>
-        `).join('')}</tbody>
+      <table class="grid-table"><thead><tr><th>Date</th><th>Pieces</th><th>Rejects</th><th>Wages</th></tr></thead>
+        <tbody>${days.map(d => `<tr><td>${dateShort(d)}</td><td>${byDay[d].pieces}</td><td>${byDay[d].rejects}</td><td>₹${Math.round(byDay[d].wages).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
 function buildOperatorReport (rows) {
   if (!rows.length) return emptyState('i-users', 'No operator data', 'No production entries in this range.');
   const byEmp = {};
-  rows.forEach(r => {
-    if (!byEmp[r.empId]) byEmp[r.empId] = { name:r.operatorName || '—', line:r.line || '', pieces:0, rejects:0, wages:0 };
-    byEmp[r.empId].pieces += r.qty;
-    byEmp[r.empId].rejects += r.reject || 0;
-    byEmp[r.empId].wages += Number(r.amount) || 0;
-  });
+  rows.forEach(r => { if (!byEmp[r.empId]) byEmp[r.empId] = { name:r.operatorName || '—', line:r.line || '', pieces:0, rejects:0, wages:0 }; byEmp[r.empId].pieces += r.qty; byEmp[r.empId].rejects += r.reject || 0; byEmp[r.empId].wages += Number(r.amount) || 0; });
   const list = Object.entries(byEmp).sort((a,b) => b[1].pieces - a[1].pieces);
   const totalPieces = rows.reduce((a,b)=>a+b.qty,0);
   const totalWages = rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
@@ -3182,20 +2803,10 @@ function buildOperatorReport (rows) {
       <div class="rh-s">${totalPieces} pieces · ${money(totalWages)} wages</div>
     </div>
     <div class="grid-scroll">
-      <table class="grid-table">
-        <thead><tr><th>Operator</th><th>Line</th><th>Pieces</th><th>Rejects</th><th>Wages</th></tr></thead>
-        <tbody>${list.map(([empId, emp]) => `
-          <tr>
-            <td>${escapeHtml(emp.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">${escapeHtml(empId)}</div></td>
-            <td>${escapeHtml(emp.line)}</td>
-            <td>${emp.pieces}</td>
-            <td>${emp.rejects}</td>
-            <td>₹${Math.round(emp.wages).toLocaleString('en-IN')}</td>
-          </tr>
-        `).join('')}</tbody>
+      <table class="grid-table"><thead><tr><th>Operator</th><th>Line</th><th>Pieces</th><th>Rejects</th><th>Wages</th></tr></thead>
+        <tbody>${list.map(([empId, emp]) => `<tr><td>${escapeHtml(emp.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">${escapeHtml(empId)}</div></td><td>${escapeHtml(emp.line)}</td><td>${emp.pieces}</td><td>${emp.rejects}</td><td>₹${Math.round(emp.wages).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
 function buildBundleReport (rows) {
@@ -3215,26 +2826,14 @@ function buildBundleReport (rows) {
   const totalPcs = items.reduce((a,b) => a + b.pieces, 0);
   const totalWages = items.reduce((a,b) => a + b.wages, 0);
   const totalMargin = items.reduce((a,b) => a + b.margin, 0);
-  const head = acc
-    ? `<tr><th>Bundle</th><th>Pieces</th><th>Rejects</th><th>Wages</th><th>Revenue</th><th>Margin</th></tr>`
-    : `<tr><th>Bundle</th><th>Pieces</th><th>Rejects</th><th>Wages</th></tr>`;
+  const head = acc ? `<tr><th>Bundle</th><th>Pieces</th><th>Rejects</th><th>Wages</th><th>Revenue</th><th>Margin</th></tr>` : `<tr><th>Bundle</th><th>Pieces</th><th>Rejects</th><th>Wages</th></tr>`;
   const bodyRows = items.map(it => {
     if (acc) {
       const cls = it.margin >= 0 ? 'has-val' : '';
       const stl = it.margin < 0 ? 'background:rgba(220,38,38,.1);color:#B91C1C;font-weight:700' : '';
-      return `<tr>
-        <td>${escapeHtml(it.b.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">₹${it.b.sellingPrice||0}/pc sell</div></td>
-        <td>${it.pieces}</td><td>${it.rejects}</td>
-        <td>₹${Math.round(it.wages).toLocaleString('en-IN')}</td>
-        <td>₹${Math.round(it.revenue).toLocaleString('en-IN')}</td>
-        <td class="${cls}" style="${stl}">₹${Math.round(it.margin).toLocaleString('en-IN')}</td>
-      </tr>`;
+      return `<tr><td>${escapeHtml(it.b.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">₹${it.b.sellingPrice||0}/pc sell</div></td><td>${it.pieces}</td><td>${it.rejects}</td><td>₹${Math.round(it.wages).toLocaleString('en-IN')}</td><td>₹${Math.round(it.revenue).toLocaleString('en-IN')}</td><td class="${cls}" style="${stl}">₹${Math.round(it.margin).toLocaleString('en-IN')}</td></tr>`;
     }
-    return `<tr>
-      <td>${escapeHtml(it.b.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">₹${bundleCostPerPiece(it.b)}/pc cost</div></td>
-      <td>${it.pieces}</td><td>${it.rejects}</td>
-      <td>₹${Math.round(it.wages).toLocaleString('en-IN')}</td>
-    </tr>`;
+    return `<tr><td>${escapeHtml(it.b.name)}<div style="font-size:9px;color:var(--text-3);font-weight:500">₹${bundleCostPerPiece(it.b)}/pc cost</div></td><td>${it.pieces}</td><td>${it.rejects}</td><td>₹${Math.round(it.wages).toLocaleString('en-IN')}</td></tr>`;
   }).join('');
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#65A30D,#84CC16)">
@@ -3242,22 +2841,13 @@ function buildBundleReport (rows) {
       <div class="rh-v">${totalPcs.toLocaleString('en-IN')} pcs</div>
       <div class="rh-s">${items.length} bundle${items.length>1?'s':''} · ${money(totalWages)} wages${acc ? ' · ' + money(totalMargin) + ' margin' : ''}</div>
     </div>
-    <div class="grid-scroll">
-      <table class="grid-table"><thead>${head}</thead><tbody>${bodyRows}</tbody></table>
-    </div>
-  `;
+    <div class="grid-scroll"><table class="grid-table"><thead>${head}</thead><tbody>${bodyRows}</tbody></table></div>`;
 }
 
 function buildOperationReport (rows) {
   if (!rows.length) return emptyState('i-chart', 'No operation data', 'No production entries in this range.');
   const byOp = {};
-  rows.forEach(r => {
-    if (!byOp[r.operation]) byOp[r.operation] = { pieces:0, rejects:0, wages:0, ops:new Set() };
-    byOp[r.operation].pieces += r.qty;
-    byOp[r.operation].rejects += r.reject || 0;
-    byOp[r.operation].wages += Number(r.amount) || 0;
-    byOp[r.operation].ops.add(r.empId);
-  });
+  rows.forEach(r => { if (!byOp[r.operation]) byOp[r.operation] = { pieces:0, rejects:0, wages:0, ops:new Set() }; byOp[r.operation].pieces += r.qty; byOp[r.operation].rejects += r.reject || 0; byOp[r.operation].wages += Number(r.amount) || 0; byOp[r.operation].ops.add(r.empId); });
   const list = Object.entries(byOp).sort((a,b) => b[1].pieces - a[1].pieces);
   const totalPcs = rows.reduce((a,b)=>a+b.qty,0);
   const totalWages = rows.reduce((a,b)=>a+(Number(b.amount)||0),0);
@@ -3268,20 +2858,10 @@ function buildOperationReport (rows) {
       <div class="rh-s">${totalPcs} pieces · ${money(totalWages)} wages</div>
     </div>
     <div class="grid-scroll">
-      <table class="grid-table">
-        <thead><tr><th>Operation</th><th>Pieces</th><th>Rejects</th><th>Operators</th><th>Wages</th></tr></thead>
-        <tbody>${list.map(([op, d]) => `
-          <tr>
-            <td>${escapeHtml(op)}</td>
-            <td>${d.pieces}</td>
-            <td>${d.rejects}</td>
-            <td>${d.ops.size}</td>
-            <td>₹${Math.round(d.wages).toLocaleString('en-IN')}</td>
-          </tr>
-        `).join('')}</tbody>
+      <table class="grid-table"><thead><tr><th>Operation</th><th>Pieces</th><th>Rejects</th><th>Operators</th><th>Wages</th></tr></thead>
+        <tbody>${list.map(([op, d]) => `<tr><td>${escapeHtml(op)}</td><td>${d.pieces}</td><td>${d.rejects}</td><td>${d.ops.size}</td><td>₹${Math.round(d.wages).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
 function emptyState (iconId, title, text) {
@@ -3310,7 +2890,7 @@ function openSettingsSheet () {
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last pull</span><b>${Sync.lastPull ? timeShort(Sync.lastPull) : '—'}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
       </div>
-      <div class="hint">Only shards that changed are uploaded. Real-time listeners keep every device in sync instantly.</div>
+      <div class="hint">Sharded across 5 documents. Real-time listeners keep every device in sync instantly.</div>
     </div>
     <div class="field">
       <label>Manual Sync</label>
@@ -3324,10 +2904,7 @@ function openSettingsSheet () {
       <div class="hint">Last file backup: <b>${escapeHtml(backupLabel)}</b></div>
     </div>
     ${pinSection}
-    <div class="field">
-      <label>Danger zone</label>
-      <button class="btn red" id="doClearBtn">${icon('i-trash')} Clear all data</button>
-    </div>
+    <div class="field"><label>Danger zone</label><button class="btn red" id="doClearBtn">${icon('i-trash')} Clear all data</button></div>
   `;
   openSheet('Settings', html, null);
   setTimeout(() => {
@@ -3367,14 +2944,8 @@ function openPinChangeSheet (role) {
 setLoginRole('admin');
 updatePinSlots();
 
-$$('#segTeam .filter-chip').forEach(b => b.addEventListener('click', () => {
-  $$('#segTeam .filter-chip').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); teamTab = b.dataset.tab; renderTeam();
-}));
-$$('#segWork .filter-chip').forEach(b => b.addEventListener('click', () => {
-  $$('#segWork .filter-chip').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); workFilter = b.dataset.f; renderWork();
-}));
+$$('#segTeam .filter-chip').forEach(b => b.addEventListener('click', () => { $$('#segTeam .filter-chip').forEach(x => x.classList.remove('on')); b.classList.add('on'); teamTab = b.dataset.tab; renderTeam(); }));
+$$('#segWork .filter-chip').forEach(b => b.addEventListener('click', () => { $$('#segWork .filter-chip').forEach(x => x.classList.remove('on')); b.classList.add('on'); workFilter = b.dataset.f; renderWork(); }));
 $('#searchWork').addEventListener('input', e => { workSearch = e.target.value; renderWork(); });
 $('#searchTeam').addEventListener('input', e => { teamSearch = e.target.value; renderTeam(); });
 $('#addBundleBtn').addEventListener('click', openNewBundle);
@@ -3391,7 +2962,9 @@ attachRipple();
 updateSyncIndicator();
 
 /* Boot: connect to Firestore, pull latest shards, start live listeners. */
-Sync.bootstrap().catch(() => {});
+Sync.bootstrap().catch(err => {
+  console.warn('Sync bootstrap failed:', err);
+});
 
 /* Recurring expenses are checked every minute while the app is open. */
 setInterval(() => {
@@ -3403,7 +2976,7 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-/* Coming back to the app: refresh once a minute at most (safety net — onSnapshot handles the rest). */
+/* Coming back to the app: safety pull once a minute (onSnapshot handles live changes). */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   const created = processRecurring();
