@@ -1158,14 +1158,13 @@ const Sync = {
     }
   },
 
-  async bootstrap () {
+   async bootstrap () {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await this._ensureFirebase();
         const pullStatus = await this.pull(true, isFreshSeed);
         isFreshSeed = false;
 
-        // Cloud unreachable on boot — don't push local state over remote.
         if (pullStatus === 'failed') {
           this.lastError = this.lastError || 'Cloud pull failed';
           this.setStatus('error');
@@ -1173,10 +1172,14 @@ const Sync = {
             await new Promise(r => setTimeout(r, 2000 * attempt));
             continue;
           }
-          // Give up but keep the app usable — local only, red dot.
           this._bootstrapped = true;
           return;
         }
+
+        this._bootstrapped = true;
+        
+        // Connect real-time listeners FIRST, so the app is live instantly
+        await this._subscribe();
 
         const fb = await this._ensureFirebase();
         const missing = [];
@@ -1186,8 +1189,6 @@ const Sync = {
             if (!remote) missing.push(n);
           } catch (e) { /* skip this shard; retried next save */ }
         }
-
-        this._bootstrapped = true;
 
         if (missing.length) {
           // First-time setup: push all shards so the cloud mirrors local.
@@ -1205,8 +1206,6 @@ const Sync = {
             this.setStatus('synced');
           }
         }
-
-        await this._subscribe();
         return;
       } catch (e) {
         this.lastError = e.message;
@@ -2874,7 +2873,10 @@ function openSettingsSheet () {
   const days = !META.lastBackup ? Infinity : Math.floor((Date.now() - META.lastBackup) / 86400000);
   const backupLabel = days === Infinity ? 'Never' : days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago';
   const statusLabel = { idle:'Ready', pulling:'Pulling…', pushing:'Pushing…', synced:'Synced', error:'Error: ' + (Sync.lastError || 'unknown') }[Sync.status] || Sync.status;
-  const realtimeLabel = Sync._unsubs.length ? '🟢 Connected' : '⚪ Not connected';
+  
+  const getRealtimeHtml = () => Sync._unsubs.length 
+    ? '<span style="color:var(--emerald)">●</span> Connected' 
+    : '<span style="color:var(--text-4)">●</span> Not connected';
 
   const pinSection = isAdmin()
     ? `<div class="field"><label>Admin PIN</label><button class="btn gray sm" id="changeAdminPin" style="width:100%">Change Admin PIN</button><div class="hint">Account PIN can only be changed by the Account user.</div></div>`
@@ -2886,7 +2888,7 @@ function openSettingsSheet () {
       <div style="padding:14px;background:var(--surface-2);border-radius:12px">
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Backend</span><b>Firebase Firestore</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">State</span><b>${escapeHtml(statusLabel)}</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Real-time</span><b>${realtimeLabel}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Real-time</span><b id="realtimeLabel">${getRealtimeHtml()}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last pull</span><b>${Sync.lastPull ? timeShort(Sync.lastPull) : '—'}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
       </div>
@@ -2906,7 +2908,16 @@ function openSettingsSheet () {
     ${pinSection}
     <div class="field"><label>Danger zone</label><button class="btn red" id="doClearBtn">${icon('i-trash')} Clear all data</button></div>
   `;
+  
   openSheet('Settings', html, null);
+  
+  // Live-update the real-time label while the sheet is open
+  const intv = setInterval(() => {
+    const el = $('#realtimeLabel');
+    if (!el || !sheet.classList.contains('on')) { clearInterval(intv); return; }
+    el.innerHTML = getRealtimeHtml();
+  }, 1000);
+
   setTimeout(() => {
     $('#syncPullBtn').addEventListener('click', async () => { closeSheet(); await Sync.pull(false); });
     $('#syncPushBtn').addEventListener('click', async () => { closeSheet(); await Sync.push(true); });
@@ -2916,6 +2927,7 @@ function openSettingsSheet () {
     const ap = $('#changeAdminPin'); if (ap) ap.addEventListener('click', () => openPinChangeSheet('admin'));
     const cp = $('#changeAccountPin'); if (cp) cp.addEventListener('click', () => openPinChangeSheet('account'));
   }, 60);
+}
 }
 window.openSettingsSheet = openSettingsSheet;
 
