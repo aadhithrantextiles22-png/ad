@@ -443,16 +443,12 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 .adv-set-chip.out{background:#FEE2E2;color:#991B1B}
 .adv-set-chip.on{background:var(--emerald-lt);color:var(--emerald-dk)}
 
-/* ── NEW: tally / payment rows ── */
-.tally-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0}
-.tally-row .tl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
-.tally-row .tv{font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
-.tally-sec-hd{font-size:10.5px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;padding:10px 0 6px;border-top:1px dashed var(--separator-2);margin-top:8px;display:flex;justify-content:space-between;align-items:center}
-.tally-sec-hd:first-child{border-top:none;margin-top:0;padding-top:2px}
-.tally-actions{display:flex;gap:8px;padding:0 16px 12px}
-.tally-actions .btn{flex:1;min-width:0}
-.tally-badge{background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800}
-.tally-badge.due{background:#FEE2E2;color:#991B1B}
+.shard-row{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:500;padding:6px 0;border-bottom:1px solid var(--separator)}
+.shard-row:last-child{border-bottom:none}
+.shard-row .sr-l{color:var(--text-3)}
+.shard-row .sr-r{font-weight:700;font-variant-numeric:tabular-nums}
+.shard-bar{height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden;margin-top:4px}
+.shard-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,#0F766E,#14B8A6)}
 
 @keyframes rippleAnim{to{transform:scale(2.4);opacity:0}}
 @keyframes popIn{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
@@ -464,7 +460,7 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 
 @media print{
   body{background:#fff;overflow:visible}
-  .app-header,.tabbar,.fab,.filter-bar,.custom-date-row,.active-filter-strip,.share-btn,#exportPdfBtn,.reports-top-pad,.month-nav,.tally-actions{display:none !important}
+  .app-header,.tabbar,.fab,.filter-bar,.custom-date-row,.active-filter-strip,.share-btn,#exportPdfBtn,.reports-top-pad,.month-nav{display:none !important}
   .screens{padding:0;overflow:visible}
   .screen:not(.active){display:none !important}
   #reportContent{padding:0}
@@ -515,7 +511,6 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
   <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
   <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></symbol>
   <symbol id="i-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 1 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-3a2 2 0 1 1 4 0"/></symbol>
-  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.4"/></symbol>
 </svg>
 
 <div class="login" id="loginScreen">
@@ -660,22 +655,47 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
-   AADHITHRAN ERP — v13
-   Changes in this version:
-     • Advance Ledger — payment tally (record / delete payments per person)
-     • Staff attendance — editable date (log hours for any day)
-     • Monthly Grid — per-person operation breakdown
-     • Proper A4 PDF export for every report (incl. advance ledger)
+   AADHITHRAN ERP — v13  (Sharded JSONBin Sync)
+   ───────────────────────────────────────────────────────────────────
+   JSONBin's free plan rejects any record larger than 100 KB with
+   HTTP 403 "Free users cannot update a record over 100kb".
+   To stay far below that ceiling, the database is split into 5 small
+   records ("shards"). The original bin now only holds a tiny manifest
+   describing which bin belongs to which shard.
+
+      people     → employees, companyStaff, recents
+      catalog    → bundles, masterOps
+      production → production
+      finance    → expenses, advances, staffHours, recurring
+      config     → admin, account, version
+
+   Only shards whose data actually changed are uploaded. Each shard
+   keeps its own timestamp so a device only downloads what moved.
    ═══════════════════════════════════════════════════════════════════ */
 
 const LS = 'aadhithran_erp_v12';
 const META_LS = 'aadhithran_meta_v12';
 
 const JSONBIN_API_KEY = '$2a$10$B8zPn16pugEhGeSU1agI4uWaUQYBeCFMWryHYKZJ4/6LoDL0SziFy';
-const JSONBIN_BIN_ID  = '6aba0ef1ffd5d1605336a452';
-const JSONBIN_BASE    = 'https://api.jsonbin.io/v3/b';
-const SYNC_INTERVAL   = 30 * 1000;
-const PUSH_DEBOUNCE   = 3000;
+
+/* This bin holds the shard registry. It used to hold the whole database,
+   so on first run it is auto-migrated into the shards below. */
+const JSONBIN_MANIFEST_BIN_ID = '6aba0ef1ffd5d1605336a452';
+
+const JSONBIN_BASE   = 'https://api.jsonbin.io/v3/b';
+const SYNC_INTERVAL  = 5 * 60 * 1000;   // idle poll (manifest = 1 request)
+const PUSH_DEBOUNCE  = 3000;
+const SHARD_WARN_BYTES = 88 * 1024;     // warn before the 100 KB wall
+const SHARD_HARD_LIMIT = 100 * 1024;
+
+const SHARD_DEFS = {
+  people:     { label:'People',     keys:['employees','companyStaff','recents'] },
+  catalog:    { label:'Catalog',    keys:['bundles','masterOps'] },
+  production: { label:'Production', keys:['production'] },
+  finance:    { label:'Finance',    keys:['expenses','advances','staffHours','recurring'] },
+  config:     { label:'Config',     keys:['admin','account','version'] },
+};
+const SHARD_NAMES = Object.keys(SHARD_DEFS);
 
 const LINES = ['L-01','L-02','L-03','L-04'];
 const SKILLS = ['Tailor','Checker','Helper','Ironman','Cutter','Packer','Supervisor'];
@@ -711,6 +731,7 @@ const _avMap = {};
 function av (k) { if (!_avMap[k]) _avMap[k] = _avColors[Object.keys(_avMap).length % _avColors.length]; return _avMap[k]; }
 function uid (p='id') { return p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function kb (n) { return (n / 1024).toFixed(1) + ' KB'; }
 
 function staffHourlyRate (s) {
   const hrs = Number(s.hoursPerDay) || 8;
@@ -722,9 +743,6 @@ function staffHourlyRate (s) {
 function staffHoursToday (staffId) {
   const t = todayISO();
   return DB.staffHours.find(h => h.staffId === staffId && h.date === t);
-}
-function staffHoursOn (staffId, date) {
-  return DB.staffHours.find(h => h.staffId === staffId && h.date === date);
 }
 function staffMonthTotal (staffId, month) {
   return DB.staffHours.filter(h => h.staffId === staffId && h.date.slice(0,7) === month)
@@ -757,24 +775,10 @@ function deleteStaffHours (id) {
   save();
 }
 
-/* ══════════ ADVANCE TALLY HELPERS ══════════ */
-function advancePaymentsFor (personType, personId) {
-  return (DB.advancePayments || []).filter(p => p.personType === personType && p.personId === personId);
-}
-function advanceTotals (personType, personId) {
-  const advances = DB.advances.filter(a => a.personType === personType && a.personId === personId);
-  const tallyAdvance = advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount) || 0), 0);
-  const waived       = advances.filter(a =>  a.settled).reduce((s,a) => s + (Number(a.amount) || 0), 0);
-  const paid         = advancePaymentsFor(personType, personId).reduce((s,p) => s + (Number(p.amount) || 0), 0);
-  return {
-    advanceTotal: tallyAdvance,
-    waivedTotal: waived,
-    paidTotal: paid,
-    outstanding: Math.max(0, tallyAdvance - paid),
-  };
-}
 function advanceOutstanding (personType, personId) {
-  return advanceTotals(personType, personId).outstanding;
+  return DB.advances
+    .filter(a => a.personType === personType && a.personId === personId && !a.settled)
+    .reduce((s, a) => s + (Number(a.amount) || 0), 0);
 }
 function advanceTotalInPeriod (personType, personId, from, to) {
   return DB.advances
@@ -782,19 +786,13 @@ function advanceTotalInPeriod (personType, personId, from, to) {
     .filter(a => a.date >= from && a.date <= to)
     .reduce((s, a) => s + (Number(a.amount) || 0), 0);
 }
-function advancePaidInPeriod (personType, personId, from, to) {
-  return (DB.advancePayments || [])
-    .filter(p => p.personType === personType && p.personId === personId)
-    .filter(p => p.date >= from && p.date <= to)
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-}
 function toggleAdvanceSettled (id) {
   const a = DB.advances.find(x => x.id === id);
   if (!a) return;
   a.settled = !a.settled;
   save();
   showSuccess();
-  toast(a.settled ? 'Waived from tally' : 'Restored to tally');
+  toast(a.settled ? 'Marked settled' : 'Marked outstanding');
   if (currentReport === 'advance') renderReportContent();
 }
 window.toggleAdvanceSettled = toggleAdvanceSettled;
@@ -807,123 +805,6 @@ function deleteAdvance (id) {
   if (currentReport === 'advance') renderReportContent();
 }
 window.deleteAdvance = deleteAdvance;
-function deleteAdvancePayment (id) {
-  if (!confirm('Delete this tally payment entry?')) return;
-  DB.advancePayments = (DB.advancePayments || []).filter(x => x.id !== id);
-  save();
-  showSuccess();
-  toast('Payment removed');
-  if (currentReport === 'advance') renderReportContent();
-}
-window.deleteAdvancePayment = deleteAdvancePayment;
-
-/* ══════════ TALLY PAYMENT SHEET ══════════ */
-function openAdvancePaymentSheet (preType, preId) {
-  const activeEmps = DB.employees.filter(x => x.status === 'Active');
-  const staffList  = DB.companyStaff;
-  if (!activeEmps.length && !staffList.length) { toast('Add people first', {success:false}); return; }
-
-  const initType = preType || (activeEmps.length ? 'operator' : 'staff');
-  const initId   = preId || (initType === 'operator' ? (activeEmps[0] && activeEmps[0].id) : (staffList[0] && staffList[0].id)) || '';
-
-  const optionsFor = (type, sel) => {
-    if (type === 'operator') {
-      if (!activeEmps.length) return '<option value="">No active operators</option>';
-      return activeEmps.map(e =>
-        `<option value="${e.id}" ${e.id === sel ? 'selected' : ''}>${escapeHtml(e.name)} · ${escapeHtml(e.id)} · ${escapeHtml(e.line)}</option>`
-      ).join('');
-    }
-    if (!staffList.length) return '<option value="">No staff</option>';
-    return staffList.map(s =>
-      `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${escapeHtml(s.name)} · ${escapeHtml(s.role || 'Staff')}</option>`
-    ).join('');
-  };
-
-  const html = `
-    <div class="field"><label>Type</label>
-      <div class="chip-row" id="payType">
-        <button type="button" class="${initType === 'operator' ? 'on' : ''}" data-v="operator">Operator</button>
-        <button type="button" class="${initType === 'staff' ? 'on' : ''}" data-v="staff">Company Staff</button>
-      </div>
-    </div>
-    <div class="field"><label>Person</label><select id="payPerson">${optionsFor(initType, initId)}</select></div>
-    <div class="advance-box" id="paySummary" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);border-color:rgba(5,150,105,.25)">
-      <div class="ab-row"><span class="ab-l" style="color:var(--emerald-dk)">Outstanding Now</span><span class="ab-v" style="color:var(--emerald-dk)" id="payOutstanding">₹0</span></div>
-      <div class="ab-row"><span class="ab-l" style="color:var(--emerald-dk)">After This Payment</span><span class="ab-v sm" style="color:var(--emerald-dk)" id="payAfter">₹0</span></div>
-    </div>
-    <div class="field"><label>Payment Date</label><input id="payDate" type="date" value="${todayISO()}"></div>
-    <div class="field"><label>Amount Paid (₹)</label><input id="payAmount" type="number" inputmode="decimal" min="0" step="1" placeholder="0"></div>
-    <div class="field"><label>Note (optional)</label><input id="payNote" placeholder="e.g. Cash settlement"></div>
-    <button type="button" class="btn outline sm" id="payFull" style="width:100%">Tally full outstanding</button>
-  `;
-
-  openSheet('Tally Advance Payment', html, () => {
-    const typeBtn = $('#payType .on');
-    const personType = typeBtn ? typeBtn.dataset.v : 'operator';
-    const personId = $('#payPerson').value;
-    const amount = Number($('#payAmount').value) || 0;
-    if (!personId) { toast('Select a person', {success:false}); return false; }
-    if (amount <= 0) { toast('Enter an amount', {success:false}); return false; }
-
-    let personName = '';
-    if (personType === 'operator') {
-      const e = DB.employees.find(x => x.id === personId);
-      if (!e) { toast('Person not found', {success:false}); return false; }
-      personName = e.name;
-    } else {
-      const s = DB.companyStaff.find(x => x.id === personId);
-      if (!s) { toast('Person not found', {success:false}); return false; }
-      personName = s.name;
-    }
-    DB.advancePayments = DB.advancePayments || [];
-    DB.advancePayments.push({
-      id: uid('pay'), personType, personId, personName,
-      date: $('#payDate').value || todayISO(),
-      amount, note: $('#payNote').value.trim(),
-      ts: Date.now(),
-    });
-    save(); showSuccess();
-    toast('Payment of ' + money(amount) + ' tallied');
-    if (currentReport === 'advance') renderReportContent();
-    else refreshCurrentScreen();
-    return true;
-  });
-
-  setTimeout(() => {
-    const updateSummary = () => {
-      const typeBtn = $('#payType .on');
-      const personType = typeBtn ? typeBtn.dataset.v : 'operator';
-      const personId = $('#payPerson').value;
-      if (!personId) { $('#payOutstanding').textContent = '₹0'; $('#payAfter').textContent = '₹0'; return; }
-      const cur = advanceOutstanding(personType, personId);
-      const amt = Number($('#payAmount').value) || 0;
-      $('#payOutstanding').textContent = money(cur);
-      $('#payAfter').textContent = money(Math.max(0, cur - amt));
-    };
-    $$('#payType button').forEach(b => b.addEventListener('click', () => {
-      $$('#payType button').forEach(x => x.classList.remove('on'));
-      b.classList.add('on');
-      const sel = $('#payPerson');
-      sel.innerHTML = optionsFor(b.dataset.v, '');
-      updateSummary();
-    }));
-    const pSel = $('#payPerson'); if (pSel) pSel.addEventListener('change', updateSummary);
-    const aInp = $('#payAmount'); if (aInp) aInp.addEventListener('input', updateSummary);
-    const fBtn = $('#payFull');
-    if (fBtn) fBtn.addEventListener('click', () => {
-      const typeBtn = $('#payType .on');
-      const personType = typeBtn ? typeBtn.dataset.v : 'operator';
-      const personId = $('#payPerson').value;
-      if (!personId) return;
-      const cur = advanceOutstanding(personType, personId);
-      $('#payAmount').value = cur > 0 ? cur : '';
-      updateSummary();
-      haptic('light');
-    });
-    updateSummary();
-  }, 60);
-}
-window.openAdvancePaymentSheet = openAdvancePaymentSheet;
 
 function nextRunHint (r) {
   const start = new Date(r.startDate + 'T00:00:00');
@@ -1048,15 +929,16 @@ function seed () {
   ];
   return {
     employees, bundles, masterOps, production,
-    expenses: [], advances: [], advancePayments: [],
+    expenses: [], advances: [],
     recents: ['EMP-021', 'EMP-014', 'EMP-008'],
     companyStaff, staffHours: [], recurring: [],
     admin:   { pin:'1234', name:'Admin' },
     account: { pin:'1605', name:'Account' },
-    session: null, version: 13, _lastModified: Date.now(),
+    session: null, version: 12, _lastModified: Date.now(), _shardTs: {},
   };
 }
 
+/* ── Local database ─────────────────────────────────────────────── */
 let isFreshSeed = false;
 let DB;
 try {
@@ -1065,32 +947,64 @@ try {
   else { DB = seed(); isFreshSeed = true; }
 } catch (e) { DB = seed(); isFreshSeed = true; }
 
-DB.employees = Array.isArray(DB.employees) ? DB.employees : [];
-DB.bundles = (DB.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] }));
-DB.masterOps = Array.isArray(DB.masterOps) ? DB.masterOps : [];
-DB.expenses = Array.isArray(DB.expenses) ? DB.expenses : [];
-DB.production = Array.isArray(DB.production) ? DB.production : [];
-DB.recents = DB.recents || [];
-DB.companyStaff = Array.isArray(DB.companyStaff) ? DB.companyStaff.map(s => ({
-  ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
-})) : [];
-DB.staffHours = Array.isArray(DB.staffHours) ? DB.staffHours : [];
-DB.recurring = Array.isArray(DB.recurring) ? DB.recurring.map(r => ({
-  ...r, amount: Number(r.amount) || 0,
-  frequency: RECUR_FREQ.includes(r.frequency) ? r.frequency : 'daily',
-  active: r.active !== false, startDate: r.startDate || todayISO(),
-})) : [];
-DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({
-  ...a, amount: Number(a.amount) || 0, settled: a.settled === true,
-})) : [];
-DB.advancePayments = Array.isArray(DB.advancePayments) ? DB.advancePayments.map(p => ({
-  ...p, amount: Number(p.amount) || 0,
-})) : [];
-DB.admin = DB.admin || { pin:'1234', name:'Admin' };
-DB.account = DB.account || { pin:'1605', name:'Account' };
-DB.session = DB.session || null;
-DB.version = 13;
-DB._lastModified = DB._lastModified || Date.now();
+function normalizeDB () {
+  DB.employees = Array.isArray(DB.employees) ? DB.employees : [];
+  DB.bundles = (DB.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] }));
+  DB.masterOps = Array.isArray(DB.masterOps) ? DB.masterOps : [];
+  DB.expenses = Array.isArray(DB.expenses) ? DB.expenses : [];
+  DB.production = Array.isArray(DB.production) ? DB.production : [];
+  DB.recents = DB.recents || [];
+  DB.companyStaff = Array.isArray(DB.companyStaff) ? DB.companyStaff.map(s => ({
+    ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
+  })) : [];
+  DB.staffHours = Array.isArray(DB.staffHours) ? DB.staffHours : [];
+  DB.recurring = Array.isArray(DB.recurring) ? DB.recurring.map(r => ({
+    ...r, amount: Number(r.amount) || 0,
+    frequency: RECUR_FREQ.includes(r.frequency) ? r.frequency : 'daily',
+    active: r.active !== false, startDate: r.startDate || todayISO(),
+  })) : [];
+  DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({
+    ...a, amount: Number(a.amount) || 0, settled: a.settled === true,
+  })) : [];
+  DB.admin = DB.admin || { pin:'1234', name:'Admin' };
+  DB.account = DB.account || { pin:'1605', name:'Account' };
+  DB.session = DB.session || null;
+  DB.version = 12;
+  DB._lastModified = DB._lastModified || Date.now();
+  DB._shardTs = (DB._shardTs && typeof DB._shardTs === 'object') ? DB._shardTs : {};
+}
+normalizeDB();
+
+/* ── Shard helpers ──────────────────────────────────────────────── */
+const _snap = {};
+function shardDataOnly (name) {
+  const out = {};
+  const def = SHARD_DEFS[name];
+  if (def) def.keys.forEach(k => { out[k] = DB[k]; });
+  return out;
+}
+function shardPayload (name) {
+  return { _app:'aadhithran-erp', _shard:name, _version:13, _lastModified: Date.now(), ...shardDataOnly(name) };
+}
+function applyShard (name, remote) {
+  const def = SHARD_DEFS[name];
+  if (!def || !remote) return false;
+  let changed = false;
+  def.keys.forEach(k => {
+    if (remote[k] !== undefined) { DB[k] = remote[k]; changed = true; }
+  });
+  return changed;
+}
+function snapshotShards () {
+  SHARD_NAMES.forEach(n => { _snap[n] = JSON.stringify(shardDataOnly(n)); });
+}
+function dirtyShards () {
+  return SHARD_NAMES.filter(n => JSON.stringify(shardDataOnly(n)) !== _snap[n]);
+}
+function shardBytes (name) {
+  return JSON.stringify(shardDataOnly(name)).length;
+}
+snapshotShards();
 
 let META;
 try { META = JSON.parse(localStorage.getItem(META_LS) || '{}'); } catch (e) { META = {}; }
@@ -1102,7 +1016,8 @@ function save () {
     DB._lastModified = Date.now();
     localStorage.setItem(LS, JSON.stringify(DB));
     updateSyncIndicator();
-    Sync.queuePush();
+    const dirty = dirtyShards();
+    if (dirty.length) Sync.queuePush(dirty);
   } catch (e) { toast('Storage full', { success: false }); }
 }
 
@@ -1110,67 +1025,194 @@ let currentSession = null;
 const isAdmin   = () => currentSession && currentSession.role === 'admin';
 const isAccount = () => currentSession && currentSession.role === 'account';
 
+/* ═══════════════════════════════════════════════════════════════════
+   SYNC — sharded JSONBin store
+   ═══════════════════════════════════════════════════════════════════ */
 const Sync = {
-  status: 'idle', lastPull: null, lastPush: null, lastError: null, remoteTs: 0,
-  _inFlight: false, _pushTimer: null, _pollTimer: null,
-  _bootstrapped: false, _pendingPush: false,
-  headers () { return { 'Content-Type':'application/json', 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta':'false' }; },
+  status: 'idle',
+  lastPull: null,
+  lastPush: null,
+  lastError: null,
+  mode: 'sharded',              // 'sharded' | 'single' (legacy fallback)
+  _inFlight: false,
+  _pushTimer: null,
+  _pollTimer: null,
+  _bootstrapped: false,
+  _pending: new Set(),
+  _warned: {},
+  _lastVisPull: 0,
+  _shards: {},                  // name → binId
+  _manifestTs: {},              // name → lastModified known in cloud
+  _manifestChecked: 0,
+
+  headers () {
+    return { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY };
+  },
   setStatus (s) { this.status = s; updateSyncIndicator(); },
+
+  /* ── low level ── */
+  async _get (binId) {
+    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}/latest`, {
+      method: 'GET',
+      headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
+      cache: 'no-store',
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const b = await r.json(); if (b && b.message) msg = b.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    return r.json();
+  },
+  async _put (binId, payload) {
+    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}`, {
+      method: 'PUT', headers: this.headers(), body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const b = await r.json(); if (b && b.message) msg = b.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    return true;
+  },
+  async _create (payload, name) {
+    const r = await fetch(JSONBIN_BASE, {
+      method: 'POST',
+      headers: { ...this.headers(), 'X-Bin-Name': 'aadhithran-' + name },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const b = await r.json(); if (b && b.message) msg = b.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    const j = await r.json();
+    const id = j && j.metadata && j.metadata.id;
+    if (!id) throw new Error('Bin created but no id returned');
+    return id;
+  },
+
+  /* ── manifest ── */
+  async _writeManifest () {
+    const payload = {
+      _app: 'aadhithran-erp', _version: 13,
+      shards: { ...this._shards }, ts: { ...this._manifestTs },
+      _lastModified: Date.now(),
+    };
+    await this._put(JSONBIN_MANIFEST_BIN_ID, payload);
+    this._manifestChecked = Date.now();
+    return true;
+  },
+  async _createAllShards () {
+    const created = {};
+    for (const name of SHARD_NAMES) {
+      const payload = shardPayload(name);
+      const id = await this._create(payload, name);
+      created[name] = id;
+      this._manifestTs[name] = payload._lastModified;
+      DB._shardTs[name] = payload._lastModified;
+      _snap[name] = JSON.stringify(shardDataOnly(name));
+    }
+    this._shards = created;
+    await this._writeManifest();
+    this.mode = 'sharded';
+    return true;
+  },
+  async _migrateFromLegacy (remote, forceReplace) {
+    const remoteTs = remote._lastModified || 0;
+    const localTs = DB._lastModified || 0;
+    if (forceReplace || remoteTs > localTs) {
+      const sess = DB.session;
+      const shardTs = DB._shardTs || {};
+      DB = { ...remote, session: sess, _shardTs: shardTs };
+      normalizeDB();
+      DB.session = sess;
+      localStorage.setItem(LS, JSON.stringify(DB));
+      snapshotShards();
+    }
+    try {
+      await this._createAllShards();
+      this.lastError = null;
+      return true;
+    } catch (e) {
+      this.mode = 'single';
+      this.lastError = 'Shard setup failed: ' + e.message;
+      return false;
+    }
+  },
+  async ensureManifest (force = false, forceReplace = false) {
+    if (this.mode === 'single') return false;
+    if (!force && this._manifestChecked && Date.now() - this._manifestChecked < 15000) return true;
+
+    let rec = null;
+    try { rec = await this._get(JSONBIN_MANIFEST_BIN_ID); }
+    catch (e) { throw new Error('Manifest read failed: ' + e.message); }
+    this._manifestChecked = Date.now();
+
+    if (rec && rec._app === 'aadhithran-erp' && rec.shards && typeof rec.shards === 'object') {
+      this._shards = rec.shards;
+      this._manifestTs = rec.ts || {};
+      this.mode = 'sharded';
+      return true;
+    }
+    if (rec && Array.isArray(rec.employees) && rec.employees.length) {
+      return await this._migrateFromLegacy(rec, forceReplace);
+    }
+    // Cloud is empty → build the shards from local data
+    try { await this._createAllShards(); }
+    catch (e) { this.mode = 'single'; this.lastError = 'Shard setup failed: ' + e.message; return false; }
+    return true;
+  },
+
+  /* ── pull ── */
   async pull (silent = false, forceReplace = false) {
     if (this._inFlight) return 'busy';
     this._inFlight = true;
     this.setStatus('pulling');
     try {
-      const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(JSONBIN_BIN_ID)}/latest`, {
-        method: 'GET',
-        headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
-        cache: 'no-store',
-      });
-      if (!r.ok) {
-        const body = await r.text().catch(() => '');
-        throw new Error(`HTTP ${r.status}${body ? ' — ' + body.slice(0, 140) : ''}`);
+      if (this.mode === 'single') return await this._pullSingle(silent, forceReplace);
+
+      let ready = false;
+      try { ready = await this.ensureManifest(true, forceReplace); }
+      catch (e) {
+        this.lastError = e.message;
+        this.setStatus('error');
+        if (!silent) toast('Pull failed: ' + e.message, { success: false });
+        return 'failed';
       }
-      const j = await r.json();
-      const remote = j && j.record ? j.record : j;
-      if (!remote || !Array.isArray(remote.employees) || remote.employees.length === 0) {
-        this.lastPull = Date.now(); this.lastError = null;
-        this.setStatus('synced');
-        if (!silent) toast('Cloud is empty');
-        return 'empty';
+      if (this.mode === 'single') return await this._pullSingle(silent, forceReplace);
+      if (!ready) { this.setStatus('error'); return 'failed'; }
+
+      const localTs = DB._shardTs;
+      const toFetch = SHARD_NAMES.filter(n =>
+        this._shards[n] && (forceReplace || (this._manifestTs[n] || 0) > (localTs[n] || 0))
+      );
+
+      let changed = false;
+      for (const n of toFetch) {
+        try {
+          const rec = await this._get(this._shards[n]);
+          if (rec && applyShard(n, rec)) {
+            localTs[n] = rec._lastModified || this._manifestTs[n] || Date.now();
+            changed = true;
+          } else if (rec) {
+            localTs[n] = rec._lastModified || this._manifestTs[n] || Date.now();
+          }
+        } catch (e) { /* one bad shard should not kill the pull */ }
       }
-      const remoteTs = remote._lastModified || 0;
-      const localTs  = DB._lastModified  || 0;
-      this.remoteTs = remoteTs;
-      if (forceReplace || remoteTs > localTs) {
-        const liveSession = DB.session;
-        DB = {
-          ...remote,
-          employees: Array.isArray(remote.employees) ? remote.employees : [],
-          bundles: (remote.bundles || []).map(b => ({ ...b, sellingPrice: Number(b.sellingPrice) || 0, ops: Array.isArray(b.ops) ? b.ops : [] })),
-          masterOps: Array.isArray(remote.masterOps) ? remote.masterOps : [],
-          expenses: Array.isArray(remote.expenses) ? remote.expenses : [],
-          advances: Array.isArray(remote.advances) ? remote.advances.map(a => ({ ...a, amount: Number(a.amount)||0, settled: a.settled === true })) : [],
-          advancePayments: Array.isArray(remote.advancePayments) ? remote.advancePayments.map(p => ({ ...p, amount: Number(p.amount)||0 })) : [],
-          production: Array.isArray(remote.production) ? remote.production : [],
-          recents: remote.recents || [],
-          companyStaff: (remote.companyStaff || []).map(s => ({
-            ...s, salary: Number(s.salary) || 0, hoursPerDay: Number(s.hoursPerDay) || 8, daysPerMonth: Number(s.daysPerMonth) || 26,
-          })),
-          staffHours: Array.isArray(remote.staffHours) ? remote.staffHours : [],
-          recurring: Array.isArray(remote.recurring) ? remote.recurring : [],
-          admin: remote.admin || { pin:'1234', name:'Admin' },
-          account: remote.account || { pin:'1605', name:'Account' },
-          session: liveSession || remote.session || null,
-          version: 13,
-        };
+
+      if (changed) {
+        normalizeDB();
+        snapshotShards();
+        DB._lastModified = Date.now();
         localStorage.setItem(LS, JSON.stringify(DB));
-        if (!silent) toast('Synced from cloud');
         processRecurring();
         refreshCurrentScreen();
+        if (!silent) toast('Synced from cloud');
       }
-      this.lastPull = Date.now(); this.lastError = null;
+      this.lastPull = Date.now();
+      this.lastError = null;
       this.setStatus('synced');
-      if (!silent) toast('Pull complete');
       return 'ok';
     } catch (e) {
       this.lastError = e.message;
@@ -1179,30 +1221,76 @@ const Sync = {
       return 'failed';
     } finally { this._inFlight = false; }
   },
-  queuePush () {
-    if (!this._bootstrapped) { this._pendingPush = true; return; }
+
+  /* ── push ── */
+  queuePush (names) {
+    (names || []).forEach(n => { if (SHARD_DEFS[n]) this._pending.add(n); });
+    if (!this._bootstrapped) return;
+    if (!this._pending.size) return;
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this.push(false), PUSH_DEBOUNCE);
   },
   async push (force = false) {
-    if (this._inFlight) { this.queuePush(); return 'busy'; }
-    this._pushTimer = null;
+    if (!this._bootstrapped && !force) {
+      if (!this._pending.size) SHARD_NAMES.forEach(n => this._pending.add(n));
+      return 'deferred';
+    }
+    if (this._inFlight) {
+      if (this._pushTimer) clearTimeout(this._pushTimer);
+      this._pushTimer = setTimeout(() => this.push(force), 1800);
+      return 'busy';
+    }
+    const names = force ? SHARD_NAMES.slice() : [...this._pending];
+    if (!names.length) return 'noop';
+
     this._inFlight = true;
+    this._pushTimer = null;
     this.setStatus('pushing');
-    const nextTs = Date.now();
     try {
-      const payload = JSON.stringify({ ...DB, _lastModified: nextTs });
-      const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(JSONBIN_BIN_ID)}`, {
-        method: 'PUT', headers: this.headers(), body: payload,
-      });
-      if (!r.ok) {
-        const body = await r.text().catch(() => '');
-        throw new Error(`HTTP ${r.status}${body ? ' — ' + body.slice(0, 140) : ''}`);
+      if (this.mode === 'single') return await this._pushSingle(force);
+
+      if (!this._shards || !this._shards.people) {
+        const ok = await this.ensureManifest(true, false).catch(() => false);
+        if (this.mode === 'single') return await this._pushSingle(force);
+        if (!ok) throw new Error(this.lastError || 'Cloud not ready');
       }
-      DB._lastModified = nextTs;
+
+      const failed = [];
+      for (const n of names) {
+        const binId = this._shards[n];
+        if (!binId) continue;
+        const payload = shardPayload(n);
+        const bytes = JSON.stringify(payload).length;
+
+        if (bytes > SHARD_WARN_BYTES && !this._warned[n]) {
+          this._warned[n] = true;
+          toast(`${SHARD_DEFS[n].label} data is ${kb(bytes)} — close to the 100 KB cloud limit`, { success:false });
+        }
+        if (bytes > SHARD_HARD_LIMIT) {
+          failed.push(`${SHARD_DEFS[n].label} is ${kb(bytes)} (over 100 KB)`);
+          continue;
+        }
+        try {
+          await this._put(binId, payload);
+          DB._shardTs[n] = payload._lastModified;
+          this._manifestTs[n] = payload._lastModified;
+          _snap[n] = JSON.stringify(shardDataOnly(n));
+          this._pending.delete(n);
+        } catch (e) {
+          failed.push(SHARD_DEFS[n].label + ': ' + e.message);
+        }
+      }
+      await this._writeManifest().catch(() => {});
       localStorage.setItem(LS, JSON.stringify(DB));
-      this.remoteTs = nextTs;
-      this.lastPush = Date.now(); this.lastError = null;
+      this.lastPush = Date.now();
+
+      if (failed.length) {
+        this.lastError = failed.join(' · ');
+        this.setStatus('error');
+        if (force) toast('Push failed: ' + failed[0], { success:false });
+        return 'failed';
+      }
+      this.lastError = null;
       this.setStatus('synced');
       if (force) toast('Pushed to cloud');
       return 'ok';
@@ -1213,22 +1301,76 @@ const Sync = {
       return 'failed';
     } finally { this._inFlight = false; }
   },
-  startPolling () { this.stopPolling(); this._pollTimer = setInterval(() => this.pull(true), SYNC_INTERVAL); },
-  stopPolling () { if (this._pollTimer) clearInterval(this._pollTimer); this._pollTimer = null; },
+
+  /* ── legacy single-record fallback (only used if shards can't be built) ── */
+  async _pullSingle (silent, forceReplace) {
+    try {
+      const rec = await this._get(JSONBIN_MANIFEST_BIN_ID);
+      if (!rec || !Array.isArray(rec.employees)) {
+        this.lastPull = Date.now(); this.setStatus('synced'); return 'empty';
+      }
+      const remoteTs = rec._lastModified || 0;
+      const localTs = DB._lastModified || 0;
+      if (forceReplace || remoteTs > localTs) {
+        const sess = DB.session;
+        DB = { ...rec, session: sess, _shardTs: {} };
+        normalizeDB();
+        DB.session = sess;
+        localStorage.setItem(LS, JSON.stringify(DB));
+        snapshotShards();
+        processRecurring();
+        refreshCurrentScreen();
+        if (!silent) toast('Synced from cloud');
+      }
+      this.lastPull = Date.now(); this.lastError = null;
+      this.setStatus('synced');
+      return 'ok';
+    } catch (e) {
+      this.lastError = e.message;
+      this.setStatus('error');
+      if (!silent) toast('Pull failed: ' + e.message, { success: false });
+      return 'failed';
+    }
+  },
+  async _pushSingle (force) {
+    try {
+      const payload = { ...DB, _shardTs: undefined, _lastModified: Date.now() };
+      await this._put(JSONBIN_MANIFEST_BIN_ID, payload);
+      DB._lastModified = payload._lastModified;
+      localStorage.setItem(LS, JSON.stringify(DB));
+      this.lastPush = Date.now(); this.lastError = null;
+      this.setStatus('synced');
+      if (force) toast('Pushed to cloud');
+      return 'ok';
+    } catch (e) {
+      this.lastError = e.message;
+      this.setStatus('error');
+      if (force) toast('Push failed: ' + e.message, { success: false });
+      return 'failed';
+    }
+  },
+
+  /* ── lifecycle ── */
+  startPolling () {
+    this.stopPolling();
+    this._pollTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') this.pull(true);
+    }, SYNC_INTERVAL);
+  },
+  stopPolling () {
+    if (this._pollTimer) clearInterval(this._pollTimer);
+    this._pollTimer = null;
+  },
   async bootstrap () {
-    const result = await this.pull(true, isFreshSeed);
-    if (result === 'failed') {
-      this._bootstrapped = true;
-      if (this._pendingPush) { this._pendingPush = false; this.queuePush(); }
-      this.startPolling(); return;
-    }
-    if (result === 'empty') await this.push(false);
-    else if (result === 'ok') {
-      if (!isFreshSeed && (DB._lastModified || 0) > (this.remoteTs || 0)) await this.push(false);
-    }
+    try { await this.ensureManifest(true, isFreshSeed); }
+    catch (e) { this.lastError = e.message; }
+
+    await this.pull(true, isFreshSeed);
     isFreshSeed = false;
     this._bootstrapped = true;
-    if (this._pendingPush) { this._pendingPush = false; this.queuePush(); }
+
+    dirtyShards().forEach(n => this._pending.add(n));
+    if (this._pending.size) this.queuePush([]);
     this.startPolling();
   },
 };
@@ -1244,7 +1386,7 @@ function updateSyncIndicator () {
   const map = {
     idle: 'Cloud backup — tap to open Settings',
     pulling: 'Pulling…', pushing: 'Pushing…',
-    synced: 'Cloud backup up to date · ' + (Sync.lastPull ? timeShort(Sync.lastPull) : ''),
+    synced: 'Cloud up to date · ' + (Sync.lastPull ? timeShort(Sync.lastPull) : ''),
     error: 'Sync error: ' + (Sync.lastError || 'unknown'),
   };
   el.title = map[s] || '';
@@ -1283,17 +1425,21 @@ function pickRestoreFile () {
       if (!remote || !Array.isArray(remote.employees)) throw new Error('Not a valid backup');
       if (!confirm('Restore this backup? This will replace local data and push to cloud.')) return;
       const liveSession = DB.session;
-      DB = { ...remote, session: liveSession || null, _lastModified: Date.now() };
-      save(); showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
+      DB = { ...remote, session: liveSession || null, _shardTs: {}, _lastModified: Date.now() };
+      normalizeDB();
+      DB.session = liveSession || null;
+      save();
+      showSuccess(); toast('Restored'); closeSheet(); refreshCurrentScreen();
+      setTimeout(() => Sync.push(true), 500);
     } catch (err) { toast('Restore failed: ' + err.message, { success:false }); }
   };
   input.click();
 }
 function confirmClearAll () {
-  if (!confirm('Delete ALL data on this device AND cloud bin?')) return;
+  if (!confirm('Delete ALL data on this device AND in the cloud?')) return;
   if (prompt('Type DELETE to confirm:') !== 'DELETE') { toast('Cancelled'); return; }
   const liveSession = DB.session;
-  DB = seed(); DB.session = liveSession; DB._lastModified = Date.now();
+  DB = seed(); DB.session = liveSession; DB._shardTs = {}; DB._lastModified = Date.now();
   save(); setTimeout(() => Sync.push(true), 500);
   showSuccess(); toast('Cleared'); closeSheet(); refreshCurrentScreen();
 }
@@ -1369,7 +1515,7 @@ function toast (msg, opts = {}) {
   t.className = 'toast' + (ok ? ' success' : '');
   requestAnimationFrame(() => t.classList.add('on'));
   clearTimeout(t._tm);
-  t._tm = setTimeout(() => t.classList.remove('on'), 2200);
+  t._tm = setTimeout(() => t.classList.remove('on'), 2400);
 }
 function haptic (type='light') {
   if (!navigator.vibrate) return;
@@ -1551,8 +1697,7 @@ function renderHome () {
   const heroSub = isAcc
     ? (s.margin >= 0 ? '▲' : '▼') + Math.abs(s.margin).toFixed(1) + '% margin'
     : 'Piece wages + expenses';
-  const outstandingAdv = DB.advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount)||0), 0)
-    - (DB.advancePayments || []).reduce((s,p) => s + (Number(p.amount)||0), 0);
+  const outstandingAdv = DB.advances.filter(a => !a.settled).reduce((s,a) => s + (Number(a.amount)||0), 0);
 
   $('#heroWrap').innerHTML = `
     <div class="hero stagger s1">
@@ -1580,7 +1725,7 @@ function renderHome () {
     if (isAcc) countUp($('#heroRev'), 0, s.revenue, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
     countUp($('#heroCost'), 0, s.cost, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
     countUp($('#heroExp'), 0, s.expenseTotal, 1000, n => '₹' + Math.round(n).toLocaleString('en-IN'));
-    if (!isAcc) { const el = $('#heroAdv'); if (el) countUp(el, 0, Math.max(0, outstandingAdv), 900, n => '₹' + Math.round(n).toLocaleString('en-IN')); }
+    if (!isAcc) { const el = $('#heroAdv'); if (el) countUp(el, 0, outstandingAdv, 900, n => '₹' + Math.round(n).toLocaleString('en-IN')); }
   }, 60);
 
   const kpis = isAcc ? [
@@ -1592,7 +1737,7 @@ function renderHome () {
     { cls:'blue', ic:'i-bundle', l:'Output', v:s.pieces, u:'pcs', sub:`${new Set(s.rows.map(x=>x.empId)).size} operators`, f:n => Math.round(n).toLocaleString('en-IN') },
     { cls:'teal', ic:'i-money', l:'Piece Wages', v:s.cost, sub:'Paid to operators', f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
     { cls:'orange', ic:'i-wallet', l:'Expenses', v:s.expenseTotal, sub:`${s.expenses.length} entr${s.expenses.length===1?'y':'ies'}`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
-    { cls:'red', ic:'i-hand', l:'Advance Out', v:Math.max(0, outstandingAdv), sub:`${DB.advances.filter(a => !a.settled).length} unsettled`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
+    { cls:'red', ic:'i-hand', l:'Advance Out', v:outstandingAdv, sub:`${DB.advances.filter(a => !a.settled).length} unsettled`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
   ];
   $('#kpis').innerHTML = kpis.map((k, i) => `
     <div class="kpi-card ${k.cls} stagger s${i+2}">
@@ -1607,12 +1752,12 @@ function renderHome () {
   const q = [
     { i:'i-work', l:'Log Work', g:'emerald', fn:'addEntry' },
     { i:'i-hand', l:'Advance', g:'red', fn:'openAddAdvance' },
-    { i:'i-money', l:'Tally Pay', g:'gold', fn:'openAdvancePaymentSheet' },
     { i:'i-expense', l:'Expense', g:'orange', fn:'openAddExpense' },
+    { i:'i-bundle', l:'Bundles', g:'blue', sc:'bundles' },
     { i:'i-grid', l:'Monthly', g:'purple', fn:'openReportMonthly' },
-    { i:'i-clock', l:'Attendance', g:'teal', fn:'openStaffHoursSheet' },
+    { i:'i-clock', l:'Staff Hrs', g:'teal', fn:'openStaffHoursSheet' },
     { i:'i-repeat', l:'Recurring', g:'gray', fn:'openRecurringSheet' },
-    { i:'i-database', l:'Backup', g:'blue', fn:'openSettingsSheet' },
+    { i:'i-database', l:'Backup', g:'gold', fn:'openSettingsSheet' },
   ];
   $('#quick').innerHTML = q.map((x, i) => {
     const onclick = x.fn ? `onclick="${x.fn}()"` : (x.sc ? `onclick="nav('${x.sc}')"` : '');
@@ -1718,8 +1863,8 @@ function renderReports () {
     { id:'monthly',  t:'Monthly Grid', s:'Day-by-day · every person', ic:'i-grid', g:'purple', c:'#7C3AED' },
     { id:'weekly',   t:'Weekly Grid',  s:'Mon–Sun breakdown per person', ic:'i-cal', g:'blue', c:'#2563EB' },
     { id:'salary',   t:'Salary Sheet', s:'Per-person wage with op detail', ic:'i-money', g:'emerald', c:'#10B981' },
-    { id:'advance',  t:'Advance Ledger', s:'Advances · tally payments · balance', ic:'i-hand', g:'red', c:'#DC2626' },
-    { id:'staffhours', t:'Staff Attendance', s:'Company staff hours & pay', ic:'i-clock', g:'teal', c:'#0F766E' },
+    { id:'advance',  t:'Advance Ledger', s:'Salary advances per person', ic:'i-hand', g:'red', c:'#DC2626' },
+    { id:'staffhours', t:'Staff Hours', s:'Company staff hours & pay', ic:'i-clock', g:'teal', c:'#0F766E' },
     { id:'expense',  t:'Expenses', s:'By category + transactions', ic:'i-expense', g:'orange', c:'#EA580C' },
     { id:'recurring', t:'Recurring', s:'Daily / weekly / monthly templates', ic:'i-repeat', g:'pink', c:'#DB2777' },
     { id:'daily',    t:'Daily Production', s:'Production summary by date', ic:'i-briefcase', g:'cyan', c:'#0891B2' },
@@ -1813,10 +1958,7 @@ function openOperatorForm (emp) {
       <div class="ab-row"><span class="ab-l">Outstanding Advance</span><span class="ab-v">${money(advOut)}</span></div>
       <div class="ab-row"><span class="ab-l">All-time Advances</span><span class="ab-v sm">${money(DB.advances.filter(a => a.personType === 'operator' && a.personId === emp.id).reduce((s,a) => s + a.amount, 0))}</span></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('operator','${emp.id}')" style="flex:1">${icon('i-plus')} Advance</button>
-      <button type="button" class="btn emerald sm" onclick="event.preventDefault();openAdvancePaymentSheet('operator','${emp.id}')" style="flex:1">${icon('i-money')} Tally Pay</button>
-    </div>
+    <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('operator','${emp.id}')" style="width:100%;margin-bottom:14px">${icon('i-plus')} Record Advance</button>
   ` : '';
   const html = `
     ${advBlock}
@@ -2312,7 +2454,7 @@ function openCompanyStaffForm (s) {
   const e = s || { id:'', name:'', role:'', salary:0, hoursPerDay:8, daysPerMonth:26 };
   const today = todayISO();
   const rate = staffHourlyRate(e);
-  const todayRec = s ? staffHoursOn(s.id, today) : null;
+  const todayRec = s ? staffHoursToday(s.id) : null;
   const todayHoursVal = todayRec ? todayRec.hours : '';
   const advOut = s ? advanceOutstanding('staff', s.id) : 0;
   const advBlock = s ? `
@@ -2320,12 +2462,9 @@ function openCompanyStaffForm (s) {
       <div class="ab-row"><span class="ab-l">Outstanding Advance</span><span class="ab-v">${money(advOut)}</span></div>
       <div class="ab-row"><span class="ab-l">All-time Advances</span><span class="ab-v sm">${money(DB.advances.filter(a => a.personType === 'staff' && a.personId === s.id).reduce((x,a) => x + a.amount, 0))}</span></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('staff','${s.id}')" style="flex:1">${icon('i-plus')} Advance</button>
-      <button type="button" class="btn emerald sm" onclick="event.preventDefault();openAdvancePaymentSheet('staff','${s.id}')" style="flex:1">${icon('i-money')} Tally Pay</button>
-    </div>
+    <button type="button" class="btn red sm" onclick="event.preventDefault();openAddAdvance('staff','${s.id}')" style="width:100%;margin-bottom:14px">${icon('i-plus')} Record Advance</button>
   ` : '';
-  const recent = s ? [...DB.staffHours.filter(h => h.staffId === s.id)].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10) : [];
+  const recent = s ? [...DB.staffHours.filter(h => h.staffId === s.id)].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 7) : [];
   const hoursListHtml = recent.length ? `
     <div class="hours-list" id="staffHoursList">
       ${recent.map(h => `
@@ -2353,16 +2492,10 @@ function openCompanyStaffForm (s) {
       <div class="hb-row"><span class="hb-l">Monthly Target</span><span class="hb-v sm" id="hbMonthly">${(Number(e.hoursPerDay)||8) * (Number(e.daysPerMonth)||26)} hrs · ${money(e.salary || 0)}</span></div>
     </div>
     ${isEdit ? `
-      <div class="field"><label>Attendance Date</label>
-        <input id="csHoursDate" type="date" value="${today}">
-        <div class="hint">Pick any date to log or correct attendance.</div>
-      </div>
-      <div class="field"><label>Hours Worked</label>
-        <input id="csTodayHours" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${todayHoursVal}">
-        <div class="hint">Auto-creates a Salary expense. Leave blank to remove.</div>
-      </div>
-      <div class="field"><label>Note</label><input id="csTodayNote" placeholder="Optional" value="${todayRec ? escapeHtml(todayRec.note || '') : ''}"></div>
-      ${recent.length ? `<div class="field"><label>Recent Attendance</label>${hoursListHtml}</div>` : ''}
+      <div class="field"><label>Log Hours · ${dateDisplay(today)}</label><input id="csTodayHours" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${todayHoursVal}">
+      <div class="hint">Auto-creates a Salary expense. Set 0 to remove.</div></div>
+      <div class="field"><label>Notes for today</label><input id="csTodayNote" placeholder="Optional" value="${todayRec ? escapeHtml(todayRec.note || '') : ''}"></div>
+      ${recent.length ? `<div class="field"><label>Last 7 Days</label>${hoursListHtml}</div>` : ''}
     ` : ''}
     ${isEdit ? `<button class="btn red" id="csDelete" style="margin-top:14px">${icon('i-trash')} Delete Staff</button>` : ''}
   `;
@@ -2374,18 +2507,9 @@ function openCompanyStaffForm (s) {
     if (!name) { toast('Name is required', {success:false}); return false; }
     if (hpd <= 0 || dpm <= 0) { toast('Hours and days must be positive', {success:false}); return false; }
     if (isEdit) {
-      DB.companyStaff[DB.companyStaff.findIndex(x => x.id === s.id)] = {
-        ...DB.companyStaff.find(x => x.id === s.id),
-        name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm,
-      };
-      const hDate = ($('#csHoursDate') || {}).value || today;
-      const hRaw  = $('#csTodayHours') ? String($('#csTodayHours').value).trim() : '';
-      const existingRec = DB.staffHours.find(h => h.staffId === s.id && h.date === hDate);
-      if (hRaw === '') {
-        if (existingRec) deleteStaffHours(existingRec.id);
-      } else {
-        saveStaffHours(s.id, hDate, Number(hRaw) || 0, ($('#csTodayNote') || {}).value || '');
-      }
+      DB.companyStaff[DB.companyStaff.findIndex(x => x.id === s.id)] = { ...DB.companyStaff.find(x => x.id === s.id), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm };
+      const todayH = $('#csTodayHours') ? ($('#csTodayHours').value) : '';
+      if (todayH !== '' && todayH !== null) saveStaffHours(s.id, today, Number(todayH) || 0, ($('#csTodayNote') || {}).value || '');
     } else {
       DB.companyStaff.push({ id: uid('cs'), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm });
     }
@@ -2402,17 +2526,6 @@ function openCompanyStaffForm (s) {
       const el2 = $('#hbMonthly'); if (el2) el2.textContent = `${total} hrs · ${money(sal)}`;
     };
     ['#csSalary','#csHoursPerDay','#csDaysPerMonth'].forEach(sel => { const el = $(sel); if (el) el.addEventListener('input', updateRate); });
-
-    /* attendance date switcher */
-    const hd = $('#csHoursDate');
-    if (hd && isEdit) hd.addEventListener('change', () => {
-      const d = hd.value || today;
-      const rec = DB.staffHours.find(h => h.staffId === s.id && h.date === d);
-      const hi = $('#csTodayHours'); if (hi) hi.value = rec ? rec.hours : '';
-      const ni = $('#csTodayNote');  if (ni) ni.value = rec ? (rec.note || '') : '';
-      haptic('light');
-    });
-
     $$('#staffHoursList [data-del]').forEach(btn => btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
       if (!confirm('Delete this hours entry?')) return;
@@ -2428,61 +2541,27 @@ function openCompanyStaffForm (s) {
   }, 60);
 }
 
-/* ══════════ STAFF ATTENDANCE — editable date ══════════ */
-function openStaffHoursSheet (initialDate) {
+function openStaffHoursSheet () {
   if (!DB.companyStaff.length) { toast('No company staff yet', {success:false}); nav('team'); return; }
-  let sheetDate = initialDate || todayISO();
-
-  const rowsHtml = (date) => DB.companyStaff.map(s => {
+  const today = todayISO();
+  const html = DB.companyStaff.map(s => {
     const rate = staffHourlyRate(s);
-    const rec = staffHoursOn(s.id, date);
-    return `<div class="field">
+    const rec = staffHoursToday(s.id);
+    return `<div class="field" data-sid="${s.id}">
       <label>${escapeHtml(s.name)} · ${money2(rate)}/hr</label>
       <input class="sh-hours" data-sid="${s.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${rec ? rec.hours : ''}">
     </div>`;
   }).join('');
-
-  const html = `
-    <div class="field"><label>Attendance Date</label>
-      <input id="shDate" type="date" value="${sheetDate}">
-      <div class="hint">Change the date to log or correct attendance for any day.</div>
-    </div>
-    <div id="shRows">${rowsHtml(sheetDate)}</div>
-    <button type="button" class="btn gray sm" id="shFill" style="width:100%;margin-top:6px">${icon('i-clock')} Fill blank rows with 8h</button>
-  `;
-
-  openSheet('Staff Attendance', html, () => {
-    const date = ($('#shDate') || {}).value || todayISO();
+  openSheet('Log Staff Hours · ' + dateDisplay(today), html, () => {
     let count = 0;
     $$('.sh-hours').forEach(inp => {
-      const v = String(inp.value).trim();
-      const sid = inp.dataset.sid;
-      const prev = DB.staffHours.find(h => h.staffId === sid && h.date === date);
-      if (v === '') { if (prev) { deleteStaffHours(prev.id); count++; } return; }
-      const h = Number(v) || 0;
-      if (prev && Number(prev.hours) === h) return;
-      saveStaffHours(sid, date, h, '');
-      count++;
+      const v = inp.value.trim(); if (v === '') return;
+      saveStaffHours(inp.dataset.sid, today, Number(v) || 0, ''); count++;
     });
-    if (count > 0) { save(); showSuccess(); toast(count + ' attendance row' + (count > 1 ? 's' : '') + ' saved'); }
-    else toast('No changes');
+    if (count > 0) { save(); showSuccess(); toast(count + ' saved'); }
+    else toast('Nothing to save');
     refreshCurrentScreen(); return true;
   });
-
-  setTimeout(() => {
-    const dEl = $('#shDate');
-    if (dEl) dEl.addEventListener('change', () => {
-      const d = dEl.value || todayISO();
-      sheetDate = d;
-      $('#shRows').innerHTML = rowsHtml(d);
-      haptic('light');
-    });
-    const fEl = $('#shFill');
-    if (fEl) fEl.addEventListener('click', () => {
-      $$('.sh-hours').forEach(inp => { if (!String(inp.value).trim()) inp.value = '8'; });
-      haptic('light');
-    });
-  }, 60);
 }
 window.openStaffHoursSheet = openStaffHoursSheet;
 
@@ -2673,16 +2752,16 @@ function renderActiveFilters () {
 }
 
 let currentReport = null;
-const REPORT_TITLES = {
-  monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet', staffhours:'Staff Attendance',
-  expense:'Expense Report', recurring:'Recurring Expenses', daily:'Daily Production',
-  operator:'Operator Report', bundle:'Bundle Report', operation:'Operation Report',
-  pnl:'Profit & Loss', advance:'Advance Ledger',
-};
 function openReport (id) {
   if (id === 'pnl' && !isAccount()) { toast('Account access only', {success:false}); return; }
   currentReport = id;
-  nav('reportDetail', { title: REPORT_TITLES[id] || 'Report' });
+  const titles = {
+    monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet', staffhours:'Staff Hours',
+    expense:'Expense Report', recurring:'Recurring Expenses', daily:'Daily Production',
+    operator:'Operator Report', bundle:'Bundle Report', operation:'Operation Report',
+    pnl:'Profit & Loss', advance:'Advance Ledger',
+  };
+  nav('reportDetail', { title: titles[id] || 'Report' });
 }
 function openReportSalary () { openReport('salary'); }
 function openReportMonthly () { openReport('monthly'); }
@@ -2736,130 +2815,83 @@ function renderReportContent () {
   attachRipple();
 }
 
-/* ══════════ ADVANCE LEDGER — with payment tally ══════════ */
 function buildAdvanceLedger () {
   const { from, to } = resolveDateRange();
   const periodAdvances = DB.advances.filter(a => a.date >= from && a.date <= to);
-  const periodPayments = (DB.advancePayments || []).filter(p => p.date >= from && p.date <= to);
-  const periodAdvTotal = periodAdvances.reduce((s,a) => s + (Number(a.amount)||0), 0);
-  const periodPayTotal = periodPayments.reduce((s,p) => s + (Number(p.amount)||0), 0);
-
-  const map = {};
-  const ensure = (t, id, name) => {
-    const key = t + ':' + id;
-    if (!map[key]) map[key] = {
-      personType: t, personId: id, personName: name || '—',
-      entries: [], payments: [], advanceTotal: 0, waivedTotal: 0, paidTotal: 0,
-    };
-    return map[key];
-  };
+  const periodTotal = periodAdvances.reduce((s, a) => s + a.amount, 0);
+  const periodSettled = periodAdvances.filter(a => a.settled).reduce((s, a) => s + a.amount, 0);
+  const outstandingAllTime = DB.advances.filter(a => !a.settled).reduce((s, a) => s + a.amount, 0);
+  const outstandingCount = DB.advances.filter(a => !a.settled).length;
+  const byPerson = {};
   DB.advances.forEach(a => {
-    const g = ensure(a.personType, a.personId, a.personName);
-    g.entries.push(a);
-    if (a.settled) g.waivedTotal += Number(a.amount) || 0;
-    else           g.advanceTotal += Number(a.amount) || 0;
+    const key = a.personType + ':' + a.personId;
+    if (!byPerson[key]) byPerson[key] = {
+      personType: a.personType, personId: a.personId, personName: a.personName,
+      entries: [], outstanding: 0, total: 0,
+    };
+    byPerson[key].entries.push(a);
+    byPerson[key].total += a.amount;
+    if (!a.settled) byPerson[key].outstanding += a.amount;
   });
-  (DB.advancePayments || []).forEach(p => {
-    const g = ensure(p.personType, p.personId, p.personName);
-    g.payments.push(p);
-    g.paidTotal += Number(p.amount) || 0;
+  const list = Object.values(byPerson).sort((a,b) => {
+    if (a.outstanding !== b.outstanding) return b.outstanding - a.outstanding;
+    return b.total - a.total;
   });
-
-  const list = Object.values(map).map(g => ({ ...g, outstanding: Math.max(0, g.advanceTotal - g.paidTotal) }));
-  list.sort((a,b) => (b.outstanding - a.outstanding) || (b.advanceTotal - a.advanceTotal));
-
-  const totalAdvanceAll = list.reduce((s,g) => s + g.advanceTotal, 0);
-  const totalPaidAll    = list.reduce((s,g) => s + g.paidTotal, 0);
-  const outstandingAll  = list.reduce((s,g) => s + g.outstanding, 0);
-  const duePeople       = list.filter(g => g.outstanding > 0).length;
-
+  const unsettledPeople = list.filter(p => p.outstanding > 0).length;
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#DC2626,#EF4444)">
-      <div class="rh-l">Outstanding Balance</div>
-      <div class="rh-v">${money(outstandingAll)}</div>
-      <div class="rh-s">${duePeople} ${duePeople === 1 ? 'person owes' : 'people owe'} · ${list.length} in ledger</div>
+      <div class="rh-l">Outstanding Advances</div>
+      <div class="rh-v">${money(outstandingAllTime)}</div>
+      <div class="rh-s">${unsettledPeople} ${unsettledPeople === 1 ? 'person owes' : 'people owe'} · ${outstandingCount} unsettled ${outstandingCount === 1 ? 'entry' : 'entries'}</div>
       <div class="rh-row">
-        <div class="rh-stat"><div class="rl">Total Advance</div><div class="rv">${money(totalAdvanceAll)}</div></div>
-        <div class="rh-stat"><div class="rl">Total Tallied</div><div class="rv">${money(totalPaidAll)}</div></div>
+        <div class="rh-stat"><div class="rl">Issued (period)</div><div class="rv">${money(periodTotal)}</div></div>
+        <div class="rh-stat"><div class="rl">Settled (period)</div><div class="rv">${money(periodSettled)}</div></div>
       </div>
     </div>
-    <div class="active-filter-strip" style="padding:0 16px 12px">
-      <span>📅 <b>${from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to)}</b></span>
-      <span>Issued <b>${money(periodAdvTotal)}</b></span>
-      <span>Paid <b>${money(periodPayTotal)}</b></span>
-    </div>
-    <div class="tally-actions">
-      <button class="btn red lg" onclick="openAddAdvance()">${icon('i-plus')} Advance</button>
-      <button class="btn emerald lg" onclick="openAdvancePaymentSheet()">${icon('i-money')} Tally Pay</button>
-    </div>
-    ${list.length ? list.map(g => renderAdvancePersonCard(g, from, to)).join('') : emptyState('i-hand', 'No advances yet', 'Tap "Advance" to start the ledger.')}
+    <div style="padding:0 16px 10px"><button class="btn red lg" onclick="openAddAdvance()">${icon('i-plus')} Record Advance Payment</button></div>
+    ${list.length ? list.map(p => renderAdvancePersonCard(p, from, to)).join('') : emptyState('i-hand', 'No advances yet', 'Tap "Record Advance Payment" to start the ledger.')}
   `;
 }
-
-function renderAdvancePersonCard (g, from, to) {
-  const typeLabel = g.personType === 'operator' ? 'Operator' : 'Company Staff';
-  const periodAdv = g.entries.filter(a => a.date >= from && a.date <= to).reduce((s,a) => s + (Number(a.amount)||0), 0);
-  const periodPay = g.payments.filter(p => p.date >= from && p.date <= to).reduce((s,p) => s + (Number(p.amount)||0), 0);
-  const badge = g.outstanding > 0
-    ? `<span class="tally-badge due">DUE ${money(g.outstanding)}</span>`
-    : `<span class="tally-badge">CLEARED</span>`;
-  const entriesSorted  = [...g.entries].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
-  const paymentsSorted = [...g.payments].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
-
+function renderAdvancePersonCard (p, from, to) {
+  const periodAmt = p.entries.filter(a => a.date >= from && a.date <= to).reduce((s, a) => s + a.amount, 0);
+  const typeLabel = p.personType === 'operator' ? 'Operator' : 'Company Staff';
+  const badge = p.outstanding > 0
+    ? `<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">OUTSTANDING</span>`
+    : `<span style="background:var(--emerald-lt);color:var(--emerald-dk);padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">CLEARED</span>`;
+  const sortedEntries = [...p.entries].sort((a,b) => b.date.localeCompare(a.date));
   return `
     <div class="salary-section">
       <div class="salary-emp" onclick="this.classList.toggle('expanded')">
         <div class="se-top">
-          <div class="se-av" style="background:linear-gradient(135deg,#DC2626,#EF4444)">${initials(g.personName)}</div>
+          <div class="se-av" style="background:linear-gradient(135deg,#DC2626,#EF4444)">${initials(p.personName)}</div>
           <div class="se-body">
-            <div class="se-name">${escapeHtml(g.personName)}</div>
-            <div class="se-info">${typeLabel} · ${money(g.advanceTotal)} adv · ${money(g.paidTotal)} paid${(periodAdv || periodPay) ? ' · ' + money(periodAdv - periodPay) + ' net in period' : ''}</div>
+            <div class="se-name">${escapeHtml(p.personName)}</div>
+            <div class="se-info">${typeLabel} · ${p.entries.length} entr${p.entries.length === 1 ? 'y' : 'ies'}${periodAmt > 0 ? ' · ' + money(periodAmt) + ' in period' : ''}</div>
           </div>
           <div class="se-amt">
-            <div class="se-net" style="color:${g.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(g.outstanding)}</div>
+            <div class="se-net" style="color:${p.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(p.outstanding)}</div>
             <div class="se-gross">${badge}</div>
           </div>
           <svg class="se-arrow"><use href="#i-chev-down"/></svg>
         </div>
         <div class="se-ops">
-          <div class="tally-sec-hd" style="border-top:none;margin-top:0;padding-top:2px">
-            <span>Advances Given</span><span>${money(g.advanceTotal)}</span>
-          </div>
-          ${entriesSorted.length ? entriesSorted.map(a => `
-            <div class="tally-row">
-              <span class="tl">${dateShort(a.date)}${a.note ? ' · ' + escapeHtml(a.note) : ''}</span>
-              <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-                <b class="tv" style="color:${a.settled ? 'var(--text-3)' : 'var(--red)'};${a.settled ? 'text-decoration:line-through' : ''}">${money(a.amount)}</b>
-                <button type="button" class="adv-set-chip ${a.settled ? 'out' : 'on'}" onclick="event.stopPropagation();toggleAdvanceSettled('${a.id}')">${a.settled ? 'WAIVED' : 'IN TALLY'}</button>
+          ${sortedEntries.map(a => `
+            <div class="op-line" style="align-items:center">
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dateShort(a.date)}${a.note ? ' · ' + escapeHtml(a.note) : ''}</span>
+              <span style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <b style="color:${a.settled ? 'var(--emerald-dk)' : 'var(--red)'}">${money(a.amount)}</b>
+                <button type="button" class="adv-set-chip ${a.settled ? 'on' : 'out'}" onclick="event.stopPropagation();toggleAdvanceSettled('${a.id}')">${a.settled ? '✓ SETTLED' : 'OUTSTANDING'}</button>
                 <button type="button" onclick="event.stopPropagation();deleteAdvance('${a.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(220,38,38,.1);color:var(--red);display:grid;place-items:center;font-size:14px;border:none;cursor:pointer">×</button>
               </span>
-            </div>`).join('') : `<div class="tally-row"><span class="tl" style="color:var(--text-3)">No advances</span><span></span></div>`}
-
-          <div class="tally-sec-hd">
-            <span>Payments Tallied</span><span style="color:var(--emerald-dk)">${money(g.paidTotal)}</span>
-          </div>
-          ${paymentsSorted.length ? paymentsSorted.map(p => `
-            <div class="tally-row">
-              <span class="tl">${dateShort(p.date)}${p.note ? ' · ' + escapeHtml(p.note) : ''}</span>
-              <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-                <b class="tv" style="color:var(--emerald-dk)">${money(p.amount)}</b>
-                <button type="button" onclick="event.stopPropagation();deleteAdvancePayment('${p.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(220,38,38,.1);color:var(--red);display:grid;place-items:center;font-size:14px;border:none;cursor:pointer">×</button>
-              </span>
-            </div>`).join('') : `<div class="tally-row"><span class="tl" style="color:var(--text-3)">No payments recorded</span><span></span></div>`}
-
-          <div class="op-line op-tot" style="display:flex;justify-content:space-between;margin-top:8px">
-            <span>Advance ${money(g.advanceTotal)} − Paid ${money(g.paidTotal)}</span>
-            <span style="color:${g.outstanding > 0 ? 'var(--red)' : 'var(--emerald-dk)'}">${money(g.outstanding)}</span>
-          </div>
-          ${g.waivedTotal > 0 ? `<div class="op-line" style="color:var(--text-3);font-size:11px"><span>Waived (excluded)</span><span>${money(g.waivedTotal)}</span></div>` : ''}
-          <button type="button" class="btn emerald sm" style="width:100%;margin-top:10px" onclick="event.stopPropagation();openAdvancePaymentSheet('${g.personType}','${g.personId}')">${icon('i-money')} Tally Payment</button>
+            </div>
+          `).join('')}
+          <div class="op-line op-tot"><span>Total advances</span><span>${money(p.total)}</span></div>
         </div>
       </div>
     </div>
   `;
 }
 
-/* ══════════ MONTHLY GRID — with per-person operation details ══════════ */
 function buildMonthlyGrid () {
   const month = monthlyState.month || todayISO().slice(0,7);
   const [y, m] = month.split('-').map(Number);
@@ -2868,13 +2900,12 @@ function buildMonthlyGrid () {
     const d = new Date(y, m-1, i+1);
     return { day: i+1, date: isoLocal(d), dow: d.getDay() };
   });
-  const prodByEmp = {}, piecesByEmp = {}, rejectsByEmp = {};
+  const prodByEmp = {}, piecesByEmp = {};
   DB.production.forEach(p => {
     if (p.date.slice(0,7) !== month) return;
     if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {};
     prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0);
-    piecesByEmp[p.empId]  = (piecesByEmp[p.empId]  || 0) + p.qty;
-    rejectsByEmp[p.empId] = (rejectsByEmp[p.empId] || 0) + (p.reject || 0);
+    piecesByEmp[p.empId] = (piecesByEmp[p.empId] || 0) + p.qty;
   });
   const staffByRow = {};
   DB.staffHours.forEach(h => {
@@ -2915,82 +2946,6 @@ function buildMonthlyGrid () {
   if (!operatorRows && !staffRows) {
     return emptyState('i-grid', 'No data for ' + month, 'No production or hours logged this month.');
   }
-
-  /* ── per-person operation detail cards ── */
-  const opDetails = DB.employees.map(emp => {
-    const rows = DB.production.filter(p => p.empId === emp.id && p.date.slice(0,7) === month);
-    if (!rows.length) return '';
-    const ops = {};
-    rows.forEach(r => {
-      const k = r.operation || '—';
-      if (!ops[k]) ops[k] = { qty:0, wages:0, rejects:0, days:new Set() };
-      ops[k].qty     += r.qty;
-      ops[k].wages   += Number(r.amount) || 0;
-      ops[k].rejects += r.reject || 0;
-      ops[k].days.add(r.date);
-    });
-    const pieces  = rows.reduce((a,r) => a + r.qty, 0);
-    const wages   = rows.reduce((a,r) => a + (Number(r.amount)||0), 0);
-    const rejects = rows.reduce((a,r) => a + (r.reject||0), 0);
-    const opEntries = Object.entries(ops).sort((a,b) => b[1].qty - a[1].qty);
-    return `<div class="salary-section">
-      <div class="salary-emp" onclick="this.classList.toggle('expanded')">
-        <div class="se-top">
-          <div class="se-av">${initials(emp.name)}</div>
-          <div class="se-body">
-            <div class="se-name">${escapeHtml(emp.name)}</div>
-            <div class="se-info">${escapeHtml(emp.id)} · ${pieces} pcs · ${rejects} rejects · ${opEntries.length} operation${opEntries.length>1?'s':''}</div>
-          </div>
-          <div class="se-amt">
-            <div class="se-net">${money(wages)}</div>
-            <div class="se-gross">₹${pieces ? (wages/pieces).toFixed(2) : '0'}/pc avg</div>
-          </div>
-          <svg class="se-arrow"><use href="#i-chev-down"/></svg>
-        </div>
-        <div class="se-ops">
-          ${opEntries.map(([name, d]) => `
-            <div class="op-line">
-              <span>${escapeHtml(name)} · ${d.qty} pcs${d.rejects ? ' · ' + d.rejects + ' rej' : ''} · ${d.days.size}d</span>
-              <span>${money(d.wages)}</span>
-            </div>`).join('')}
-          <div class="op-line op-tot"><span>Total wages</span><span>${money(wages)}</span></div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  const staffDetails = DB.companyStaff.map(s => {
-    const hs = DB.staffHours.filter(h => h.staffId === s.id && h.date.slice(0,7) === month);
-    if (!hs.length) return '';
-    const totalH = hs.reduce((a,h) => a + (Number(h.hours)||0), 0);
-    const totalA = hs.reduce((a,h) => a + (Number(h.amount)||0), 0);
-    const rate   = staffHourlyRate(s);
-    return `<div class="salary-section">
-      <div class="salary-emp" onclick="this.classList.toggle('expanded')">
-        <div class="se-top">
-          <div class="se-av" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">${initials(s.name)}</div>
-          <div class="se-body">
-            <div class="se-name">${escapeHtml(s.name)}</div>
-            <div class="se-info">${escapeHtml(s.role || 'Staff')} · ${totalH.toFixed(1)} hrs · ${hs.length} day${hs.length>1?'s':''}</div>
-          </div>
-          <div class="se-amt">
-            <div class="se-net">${money(totalA)}</div>
-            <div class="se-gross">${money2(rate)}/hr</div>
-          </div>
-          <svg class="se-arrow"><use href="#i-chev-down"/></svg>
-        </div>
-        <div class="se-ops">
-          ${[...hs].sort((a,b) => a.date.localeCompare(b.date)).map(h => `
-            <div class="op-line">
-              <span>${dateShort(h.date)} · ${h.hours}h${h.note ? ' · ' + escapeHtml(h.note) : ''}</span>
-              <span>${money(h.amount)}</span>
-            </div>`).join('')}
-          <div class="op-line op-tot"><span>Total pay</span><span>${money(totalA)}</span></div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">
       <div class="rh-l">Monthly Total · ${month}</div>
@@ -3008,8 +2963,6 @@ function buildMonthlyGrid () {
         <tbody>${operatorRows}${staffRows}</tbody>
       </table>
     </div>
-    <div class="sec-hd" style="padding:16px 20px 6px">Individual Details <span class="sec-sub">tap to expand operations</span></div>
-    ${opDetails}${staffDetails}
   `;
 }
 
@@ -3023,16 +2976,11 @@ function buildWeeklyGrid () {
     return { date: isoLocal(d), dow: d.getDay(), label: d.toLocaleDateString('en-IN', { weekday:'short' }), day: d.getDate() };
   });
   const from = weekDays[0].date, to = weekDays[6].date;
-  const prodByEmp = {}, staffByRow = {}, opsByEmp = {};
+  const prodByEmp = {}, staffByRow = {};
   DB.production.forEach(p => {
     if (p.date < from || p.date > to) return;
     if (!prodByEmp[p.empId]) prodByEmp[p.empId] = {};
     prodByEmp[p.empId][p.date] = (prodByEmp[p.empId][p.date] || 0) + (Number(p.amount) || 0);
-    if (!opsByEmp[p.empId]) opsByEmp[p.empId] = {};
-    const k = p.operation || '—';
-    if (!opsByEmp[p.empId][k]) opsByEmp[p.empId][k] = { qty:0, wages:0 };
-    opsByEmp[p.empId][k].qty   += p.qty;
-    opsByEmp[p.empId][k].wages += Number(p.amount) || 0;
   });
   DB.staffHours.forEach(h => {
     if (h.date < from || h.date > to) return;
@@ -3070,29 +3018,6 @@ function buildWeeklyGrid () {
   if (!opRows && !stRows) {
     return emptyState('i-cal', 'No data this week', dateDisplay(from) + ' → ' + dateDisplay(to));
   }
-
-  const opDetails = DB.employees.map(emp => {
-    const ops = opsByEmp[emp.id];
-    if (!ops) return '';
-    const entries = Object.entries(ops).sort((a,b) => b[1].qty - a[1].qty);
-    const wages = entries.reduce((a,[,d]) => a + d.wages, 0);
-    const pieces = entries.reduce((a,[,d]) => a + d.qty, 0);
-    return `<div class="salary-section">
-      <div class="salary-emp" onclick="this.classList.toggle('expanded')">
-        <div class="se-top">
-          <div class="se-av">${initials(emp.name)}</div>
-          <div class="se-body"><div class="se-name">${escapeHtml(emp.name)}</div><div class="se-info">${pieces} pcs · ${entries.length} operation${entries.length>1?'s':''}</div></div>
-          <div class="se-amt"><div class="se-net">${money(wages)}</div><div class="se-gross">this week</div></div>
-          <svg class="se-arrow"><use href="#i-chev-down"/></svg>
-        </div>
-        <div class="se-ops">
-          ${entries.map(([name, d]) => `<div class="op-line"><span>${escapeHtml(name)} · ${d.qty} pcs</span><span>${money(d.wages)}</span></div>`).join('')}
-          <div class="op-line op-tot"><span>Total wages</span><span>${money(wages)}</span></div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#2563EB,#3B82F6)">
       <div class="rh-l">Week Total</div>
@@ -3109,8 +3034,6 @@ function buildWeeklyGrid () {
         <tbody>${opRows}${stRows}</tbody>
       </table>
     </div>
-    <div class="sec-hd" style="padding:16px 20px 6px">Individual Details <span class="sec-sub">tap to expand operations</span></div>
-    ${opDetails}
   `;
 }
 
@@ -3215,21 +3138,17 @@ function buildSalaryReport (rows, from, to) {
   const list = Object.values(byEmp).sort((a,b) => b.wages - a.wages);
   const total = list.reduce((a,b) => a + b.wages, 0);
   const totalPcs = list.reduce((a,b) => a + b.pieces, 0);
-  const totalAdvOutstanding = DB.advances
-    .filter(a => !a.settled && a.personType === 'operator')
-    .reduce((s, a) => s + a.amount, 0)
-    - (DB.advancePayments || []).filter(p => p.personType === 'operator').reduce((s,p) => s + p.amount, 0);
+  const totalAdvOutstanding = DB.advances.filter(a => !a.settled && a.personType === 'operator').reduce((s, a) => s + a.amount, 0);
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#059669,#10B981)">
       <div class="rh-l">Operator Wages</div>
       <div class="rh-v">${money(total)}</div>
       <div class="rh-s">${list.length} operator${list.length>1?'s':''} · ${totalPcs} pieces</div>
-      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(Math.max(0, totalAdvOutstanding))}</div></div></div>` : ''}
+      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(totalAdvOutstanding)}</div></div></div>` : ''}
     </div>
     ${list.map(emp => {
       const advOut = advanceOutstanding('operator', emp.id);
       const advInPeriod = advanceTotalInPeriod('operator', emp.id, from, to);
-      const paidInPeriod = advancePaidInPeriod('operator', emp.id, from, to);
       const netPayable = emp.wages - advInPeriod;
       return `
         <div class="salary-section">
@@ -3248,10 +3167,8 @@ function buildSalaryReport (rows, from, to) {
               }).join('')}
               <div class="op-line op-tot"><span>Total wages</span><span>${money(emp.wages)}</span></div>
               ${advInPeriod > 0 ? `<div class="op-line" style="color:#991B1B"><span>Advance this period</span><span>-${money(advInPeriod)}</span></div>` : ''}
-              ${paidInPeriod > 0 ? `<div class="op-line" style="color:var(--emerald-dk)"><span>Advance tallied this period</span><span>${money(paidInPeriod)}</span></div>` : ''}
               ${advOut > 0 ? `<div class="op-line" style="color:#991B1B"><span>Outstanding advance</span><span>${money(advOut)}</span></div>` : ''}
               <div class="op-line op-tot" style="color:var(--emerald-dk);border-top:2px solid var(--emerald-lt)"><span>Net payable</span><span>${money(netPayable)}</span></div>
-              <button type="button" class="btn emerald sm" style="width:100%;margin-top:10px" onclick="event.stopPropagation();openAdvancePaymentSheet('operator','${emp.id}')">${icon('i-money')} Tally Payment</button>
             </div>
           </div>
         </div>
@@ -3261,7 +3178,7 @@ function buildSalaryReport (rows, from, to) {
 }
 
 function buildStaffHoursReport (hours, from, to) {
-  if (!hours.length) return emptyState('i-clock', 'No attendance', 'No staff hours logged in this range.');
+  if (!hours.length) return emptyState('i-clock', 'No staff hours', 'No staff hours logged in this range.');
   const byStaff = {};
   hours.forEach(h => {
     if (!byStaff[h.staffId]) byStaff[h.staffId] = { id:h.staffId, name:h.staffName, hours:0, amount:0, hourlyRate:h.hourlyRate, days:[] };
@@ -3272,26 +3189,18 @@ function buildStaffHoursReport (hours, from, to) {
   const list = Object.values(byStaff).sort((a,b) => b.amount - a.amount);
   const totalHrs = list.reduce((a,b) => a + b.hours, 0);
   const totalAmt = list.reduce((a,b) => a + b.amount, 0);
-  const totalAdvOutstanding = DB.advances
-    .filter(a => !a.settled && a.personType === 'staff')
-    .reduce((s, a) => s + a.amount, 0)
-    - (DB.advancePayments || []).filter(p => p.personType === 'staff').reduce((s,p) => s + p.amount, 0);
+  const totalAdvOutstanding = DB.advances.filter(a => !a.settled && a.personType === 'staff').reduce((s, a) => s + a.amount, 0);
   return `
     <div class="report-hero" style="background:linear-gradient(135deg,#0F766E,#14B8A6)">
       <div class="rh-l">Total Staff Pay</div>
       <div class="rh-v">${money(totalAmt)}</div>
       <div class="rh-s">${list.length} staff · ${totalHrs.toFixed(1)} hours</div>
-      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(Math.max(0, totalAdvOutstanding))}</div></div></div>` : ''}
-    </div>
-    <div class="tally-actions" style="padding-top:0">
-      <button class="btn primary lg" onclick="openStaffHoursSheet()">${icon('i-clock')} Log Attendance</button>
-      <button class="btn emerald lg" onclick="openAdvancePaymentSheet('staff')">${icon('i-money')} Tally Pay</button>
+      ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(totalAdvOutstanding)}</div></div></div>` : ''}
     </div>
     ${list.map(emp => {
       const staffId = emp.id;
       const advOut = staffId ? advanceOutstanding('staff', staffId) : 0;
       const advInPeriod = staffId ? advanceTotalInPeriod('staff', staffId, from, to) : 0;
-      const paidInPeriod = staffId ? advancePaidInPeriod('staff', staffId, from, to) : 0;
       const netPayable = emp.amount - advInPeriod;
       return `
         <div class="salary-section">
@@ -3308,10 +3217,8 @@ function buildStaffHoursReport (hours, from, to) {
               `).join('')}
               <div class="op-line op-tot"><span>Total wages</span><span>${money(emp.amount)}</span></div>
               ${advInPeriod > 0 ? `<div class="op-line" style="color:#991B1B"><span>Advance this period</span><span>-${money(advInPeriod)}</span></div>` : ''}
-              ${paidInPeriod > 0 ? `<div class="op-line" style="color:var(--emerald-dk)"><span>Advance tallied this period</span><span>${money(paidInPeriod)}</span></div>` : ''}
               ${advOut > 0 ? `<div class="op-line" style="color:#991B1B"><span>Outstanding advance</span><span>${money(advOut)}</span></div>` : ''}
               <div class="op-line op-tot" style="color:var(--emerald-dk);border-top:2px solid var(--emerald-lt)"><span>Net payable</span><span>${money(netPayable)}</span></div>
-              <button type="button" class="btn emerald sm" style="width:100%;margin-top:10px" onclick="event.stopPropagation();openAdvancePaymentSheet('staff','${emp.id}')">${icon('i-money')} Tally Payment</button>
             </div>
           </div>
         </div>
@@ -3516,143 +3423,50 @@ function emptyState (iconId, title, text) {
 
 function shareReport () { toast('Use PDF button or screenshot'); }
 
-/* ══════════ PDF EXPORT (A4) — works for every report incl. advance ledger ══════════ */
-function exportReportPdf () {
-  if (!currentReport) { toast('Open a report first', {success:false}); return; }
-  const title = REPORT_TITLES[currentReport] || 'Report';
-
-  let rangeLabel = '';
-  if (currentReport === 'monthly') {
-    const [y, m] = (monthlyState.month || todayISO().slice(0,7)).split('-').map(Number);
-    rangeLabel = new Date(y, m-1, 1).toLocaleDateString('en-IN', { month:'long', year:'numeric' });
-  } else if (currentReport === 'weekly') {
-    const anchor = new Date((monthlyState.week || todayISO()) + 'T00:00:00');
-    const dow = anchor.getDay();
-    const monOff = dow === 0 ? -6 : 1 - dow;
-    const mon = new Date(anchor); mon.setDate(anchor.getDate() + monOff);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    rangeLabel = dateDisplay(isoLocal(mon)) + ' → ' + dateDisplay(isoLocal(sun));
-  } else if (currentReport === 'recurring') {
-    rangeLabel = 'All recurring templates';
-  } else {
-    const { from, to } = resolveDateRange();
-    rangeLabel = from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to);
-  }
-
-  const bodyHtml = $('#reportContent').innerHTML;
-  const w = window.open('', '_blank');
-  if (!w) { toast('Allow pop-ups to export PDF', {success:false}); return; }
-
-  const css = `
-    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    @page{size:A4;margin:12mm}
-    body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;color:#0F172A;background:#fff;font-size:12px}
-    button{display:none !important}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0F766E;padding-bottom:10px;margin-bottom:16px}
-    .hdr .co{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#0F766E;font-weight:800}
-    .hdr h1{font-size:20px;margin:5px 0 0;font-weight:800;letter-spacing:-.02em}
-    .hdr .rng{font-size:11px;color:#475569;font-weight:600;text-align:right;line-height:1.55}
-    .report-hero{border-radius:12px;padding:14px 16px;color:#fff;margin-bottom:12px}
-    .rh-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.85}
-    .rh-v{font-size:24px;font-weight:800;margin-top:6px}
-    .rh-s{font-size:11px;opacity:.9;margin-top:5px}
-    .rh-row{display:flex;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}
-    .rh-stat .rl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
-    .rh-stat .rv{font-size:13px;font-weight:700;margin-top:3px}
-    .grid-scroll{overflow:visible;margin:0 0 14px;border:1px solid #E2E8F0;border-radius:10px}
-    .grid-table{border-collapse:collapse;width:100%;font-size:9.5px}
-    .grid-table th,.grid-table td{padding:4px 6px;text-align:center;border-bottom:1px solid #E2E8F0;border-right:1px solid #E2E8F0;white-space:nowrap}
-    .grid-table th{background:#0F766E;color:#fff;font-weight:700;font-size:9px}
-    .grid-table th:first-child,.grid-table td:first-child{text-align:left;font-weight:700;min-width:100px}
-    .grid-table td.has-val{background:#D1FAE5;color:#065F46;font-weight:700}
-    .grid-table td.zero{color:#94A3B8}
-    .grid-table .grid-total-col{background:#ECFDF5;color:#065F46;font-weight:800}
-    .grid-table td[style*="rgba(220,38,38"]{background:#FEE2E2 !important;color:#B91C1C !important}
-    .pnl-card{border-radius:12px;padding:12px 14px;margin-bottom:10px;color:#fff}
-    .pcl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.85}
-    .pcv{font-size:20px;font-weight:800;margin-top:5px}
-    .pcs{font-size:10.5px;opacity:.9;margin-top:3px}
-    .pnl-card.rev{background:#0891B2}.pnl-card.wage{background:#7C3AED}.pnl-card.exp{background:#EA580C}
-    .pnl-card.net{background:#059669}.pnl-card.net.neg{background:#DC2626}
-    .salary-section{border:1px solid #E2E8F0;border-radius:12px;margin-bottom:10px;overflow:hidden;page-break-inside:avoid}
-    .salary-emp{padding:10px 12px}
-    .se-top{display:flex;align-items:center;gap:10px}
-    .se-av{width:34px;height:34px;border-radius:10px;background:#0F766E;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0}
-    .se-body{flex:1;min-width:0}
-    .se-name{font-size:13px;font-weight:700}
-    .se-info{font-size:10.5px;color:#64748B;margin-top:2px}
-    .se-amt{text-align:right}
-    .se-net{font-size:13px;font-weight:800;color:#059669}
-    .se-gross{font-size:10px;color:#64748B;margin-top:2px}
-    .se-ops{margin-top:8px;padding:8px 10px;background:#F8FAFC;border-radius:8px;display:block !important}
-    .op-line{display:flex;justify-content:space-between;padding:3px 0;font-size:11px;gap:10px}
-    .op-line span:first-child{color:#475569}
-    .op-line span:last-child{font-weight:700}
-    .op-tot{border-top:1px dashed #CBD5E1;margin-top:5px;padding-top:5px;font-weight:700}
-    .se-arrow{display:none}
-    .tally-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;font-size:11px}
-    .tally-row .tl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475569}
-    .tally-row .tv{font-weight:700}
-    .tally-sec-hd{font-size:10px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px;border-top:1px dashed #CBD5E1;margin-top:6px;display:flex;justify-content:space-between}
-    .tally-sec-hd:first-child{border-top:none;margin-top:0}
-    .tally-badge{background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:100px;font-size:9px;font-weight:800}
-    .tally-badge.due{background:#FEE2E2;color:#991B1B}
-    .expense-list-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #E2E8F0}
-    .expense-list-item .eli-ic{width:30px;height:30px;border-radius:9px;background:#EA580C;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .expense-list-item .eli-ic svg{width:14px;height:14px}
-    .eli-body{flex:1;min-width:0}
-    .eli-t{font-size:12px;font-weight:700}
-    .eli-s{font-size:10px;color:#64748B;margin-top:1px}
-    .eli-amt{font-size:13px;font-weight:800;color:#EA580C}
-    .sec-hd{font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.07em;padding:12px 0 6px}
-    .empty{text-align:center;padding:30px 20px;color:#64748B}
-    .empty h4{font-size:14px;color:#0F172A;margin-bottom:4px}
-    .empty .eic{display:none}
-    .hint{font-size:10.5px;color:#64748B;margin:0 0 8px}
-    .recur-chip{display:inline-block;padding:1px 6px;border-radius:100px;font-size:9px;font-weight:800;background:#CCFBF1;color:#0D5F58;text-transform:uppercase}
-    .recur-chip.off{background:#E9E9EB;color:#94A3B8}
-    .active-filter-strip{font-size:10.5px;color:#475569;padding:0 0 10px;display:flex;gap:8px;flex-wrap:wrap}
-    .report-table{border:1px solid #E2E8F0;border-radius:10px;overflow:hidden}
-  `;
-
-  w.document.open();
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>${escapeHtml(title)} — Aadhithran Enterprises</title>
-    <style>${css}</style></head><body>
-    <div class="hdr">
-      <div>
-        <div class="co">Aadhithran Enterprises</div>
-        <h1>${escapeHtml(title)}</h1>
-      </div>
-      <div class="rng">${escapeHtml(rangeLabel)}<br>Generated ${new Date().toLocaleString('en-IN')}</div>
-    </div>
-    ${bodyHtml}
-    <scr` + `ipt>setTimeout(function(){window.print();},400);</scr` + `ipt>
-  </body></html>`);
-  w.document.close();
-}
-window.exportReportPdf = exportReportPdf;
-
 function openSettingsSheet () {
   const days = !META.lastBackup ? Infinity : Math.floor((Date.now() - META.lastBackup) / 86400000);
   const backupLabel = days === Infinity ? 'Never' : days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago';
   const statusLabel = { idle:'Ready', pulling:'Pulling…', pushing:'Pushing…', synced:'Synced', error:'Error: ' + (Sync.lastError || 'unknown') }[Sync.status] || Sync.status;
+
+  const shardRows = SHARD_NAMES.map(n => {
+    const bytes = shardBytes(n);
+    const pct = Math.min(100, Math.round((bytes / SHARD_HARD_LIMIT) * 100));
+    const linked = Sync._shards && Sync._shards[n];
+    const ts = (DB._shardTs || {})[n];
+    const colour = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--gold)' : 'var(--emerald-dk)';
+    return `
+      <div class="shard-row" style="display:block">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="sr-l">${SHARD_DEFS[n].label}${linked ? '' : ' <span style="color:var(--red);font-weight:800">· not linked</span>'}</span>
+          <span class="sr-r" style="color:${colour}">${kb(bytes)}${ts ? ' · ' + timeShort(ts) : ''}</span>
+        </div>
+        <div class="shard-bar"><i style="width:${pct}%;background:${colour}"></i></div>
+      </div>`;
+  }).join('');
+
   const pinSection = isAdmin()
     ? `<div class="field"><label>Admin PIN</label><button class="btn gray sm" id="changeAdminPin" style="width:100%">Change Admin PIN</button><div class="hint">Account PIN can only be changed by the Account user.</div></div>`
     : `<div class="field"><label>Account PIN</label><button class="btn gray sm" id="changeAccountPin" style="width:100%">Change Account PIN</button><div class="hint">Admin PIN can only be changed by the Admin user.</div></div>`;
+
   const html = `
     <div class="field">
       <label>Cloud Sync Status</label>
       <div style="padding:14px;background:var(--surface-2);border-radius:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Mode</span><b>${Sync.mode === 'single' ? 'Single record (fallback)' : 'Sharded · 5 bins'}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">State</span><b>${escapeHtml(statusLabel)}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last pull</span><b>${Sync.lastPull ? timeShort(Sync.lastPull) : '—'}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
       </div>
     </div>
     <div class="field">
+      <label>Cloud Shards (100 KB limit each)</label>
+      <div style="padding:12px 14px;background:var(--surface-2);border-radius:12px">${shardRows}</div>
+      <div class="hint">Only shards that change are uploaded, so the whole database never touches the limit at once.</div>
+    </div>
+    <div class="field">
       <label>Manual Sync</label>
       <button class="btn blue" id="syncPullBtn" style="margin-bottom:8px">${icon('i-cloud-down')} Pull</button>
-      <button class="btn emerald" id="syncPushBtn">${icon('i-cloud-up')} Push</button>
+      <button class="btn emerald" id="syncPushBtn">${icon('i-cloud-up')} Push all shards</button>
     </div>
     <div class="field">
       <label>Local Backup</label>
@@ -3722,13 +3536,16 @@ $('#teamAddBtn').addEventListener('click', () => {
   else openNewCompanyStaff();
 });
 $('#shareBtn').addEventListener('click', shareReport);
-$('#exportPdfBtn').addEventListener('click', exportReportPdf);
+$('#exportPdfBtn').addEventListener('click', () => window.print());
 
 attachRipple();
 updateSyncIndicator();
 
+/* First boot: read the manifest, migrate the old single record if needed,
+   then hydrate only the shards that are newer than what we hold locally. */
 Sync.bootstrap().catch(() => {});
 
+/* Recurring expenses are checked every minute while the app is open. */
 setInterval(() => {
   const created = processRecurring();
   if (created > 0) {
@@ -3738,16 +3555,17 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-setInterval(() => Sync.pull(true), 3 * 60 * 1000);
-
+/* Coming back to the app: refresh once a minute at most (1 request per pull). */
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
+  if (document.visibilityState !== 'visible') return;
+  const created = processRecurring();
+  if (created > 0) {
+    toast(created + ' recurring expense' + (created > 1 ? 's' : '') + ' added');
+    if (currentScreen === 'home') renderHome();
+  }
+  if (Date.now() - (Sync._lastVisPull || 0) > 60 * 1000) {
+    Sync._lastVisPull = Date.now();
     Sync.pull(true);
-    const created = processRecurring();
-    if (created > 0) {
-      toast(created + ' recurring expense' + (created > 1 ? 's' : '') + ' added');
-      if (currentScreen === 'home') renderHome();
-    }
   }
 });
 </script>
