@@ -96,7 +96,6 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 .hero .hero-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.78);display:flex;align-items:center;gap:5px}
 .hero .hero-label svg{width:12px;height:12px}
 .hero .hero-badge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:100px;background:rgba(255,255,255,.2);display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,.22)}
-.hero .hero-badge svg{animation:softGlow 2.4s ease-out infinite}
 .hero .hero-amount{font-size:34px;font-weight:800;letter-spacing:-.045em;line-height:1.05;font-variant-numeric:tabular-nums}
 .hero .hero-sub{margin-top:5px;font-size:12px;color:rgba(255,255,255,.88);font-weight:500}
 .hero .hero-row{display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18)}
@@ -655,38 +654,38 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
-   AADHITHRAN ERP — v13  (Sharded JSONBin Sync)
+   AADHITHRAN ERP — v14  (Firebase Firestore sync)
    ───────────────────────────────────────────────────────────────────
-   JSONBin's free plan rejects any record larger than 100 KB with
-   HTTP 403 "Free users cannot update a record over 100kb".
-   To stay far below that ceiling, the database is split into 5 small
-   records ("shards"). The original bin now only holds a tiny manifest
-   describing which bin belongs to which shard.
+   • Local-first:  localStorage is the source of truth for the UI.
+   • Cloud:        Firestore, one document per "shard" in `shards/*`.
+   • Auth:         Anonymous Firebase auth (silent, no UI change).
+   • Real-time:    onSnapshot keeps every open device in sync.
+   • Writes:       Only shards that changed are uploaded (dirty tracking).
 
-      people     → employees, companyStaff, recents
-      catalog    → bundles, masterOps
-      production → production
-      finance    → expenses, advances, staffHours, recurring
-      config     → admin, account, version
-
-   Only shards whose data actually changed are uploaded. Each shard
-   keeps its own timestamp so a device only downloads what moved.
+   Firestore rules (Rules tab in Firebase console):
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{db}/documents {
+         match /shards/{shard} {
+           allow read, write: if request.auth != null;
+         }
+       }
+     }
    ═══════════════════════════════════════════════════════════════════ */
 
 const LS = 'aadhithran_erp_v12';
 const META_LS = 'aadhithran_meta_v12';
 
-const JSONBIN_API_KEY = '$2a$10$B8zPn16pugEhGeSU1agI4uWaUQYBeCFMWryHYKZJ4/6LoDL0SziFy';
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDly6HdphWPCHZUqYjYUzb9upO0mQmYmvI",
+  authDomain: "garment-erp-d92aa.firebaseapp.com",
+  projectId: "garment-erp-d92aa",
+  storageBucket: "garment-erp-d92aa.firebasestorage.app",
+  messagingSenderId: "11614712402",
+  appId: "1:11614712402:web:7701944732b3d0e388e58b",
+};
 
-/* This bin holds the shard registry. It used to hold the whole database,
-   so on first run it is auto-migrated into the shards below. */
-const JSONBIN_MANIFEST_BIN_ID = '6aba0ef1ffd5d1605336a452';
-
-const JSONBIN_BASE   = 'https://api.jsonbin.io/v3/b';
-const SYNC_INTERVAL  = 5 * 60 * 1000;   // idle poll (manifest = 1 request)
-const PUSH_DEBOUNCE  = 3000;
-const SHARD_WARN_BYTES = 88 * 1024;     // warn before the 100 KB wall
-const SHARD_HARD_LIMIT = 100 * 1024;
+const PUSH_DEBOUNCE = 3000;
 
 const SHARD_DEFS = {
   people:     { label:'People',     keys:['employees','companyStaff','recents'] },
@@ -731,7 +730,6 @@ const _avMap = {};
 function av (k) { if (!_avMap[k]) _avMap[k] = _avColors[Object.keys(_avMap).length % _avColors.length]; return _avMap[k]; }
 function uid (p='id') { return p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-function kb (n) { return (n / 1024).toFixed(1) + ' KB'; }
 
 function staffHourlyRate (s) {
   const hrs = Number(s.hoursPerDay) || 8;
@@ -934,7 +932,7 @@ function seed () {
     companyStaff, staffHours: [], recurring: [],
     admin:   { pin:'1234', name:'Admin' },
     account: { pin:'1605', name:'Account' },
-    session: null, version: 12, _lastModified: Date.now(), _shardTs: {},
+    session: null, version: 14, _lastModified: Date.now(), _shardTs: {},
   };
 }
 
@@ -969,7 +967,7 @@ function normalizeDB () {
   DB.admin = DB.admin || { pin:'1234', name:'Admin' };
   DB.account = DB.account || { pin:'1605', name:'Account' };
   DB.session = DB.session || null;
-  DB.version = 12;
+  DB.version = 14;
   DB._lastModified = DB._lastModified || Date.now();
   DB._shardTs = (DB._shardTs && typeof DB._shardTs === 'object') ? DB._shardTs : {};
 }
@@ -982,9 +980,6 @@ function shardDataOnly (name) {
   const def = SHARD_DEFS[name];
   if (def) def.keys.forEach(k => { out[k] = DB[k]; });
   return out;
-}
-function shardPayload (name) {
-  return { _app:'aadhithran-erp', _shard:name, _version:13, _lastModified: Date.now(), ...shardDataOnly(name) };
 }
 function applyShard (name, remote) {
   const def = SHARD_DEFS[name];
@@ -1000,9 +995,6 @@ function snapshotShards () {
 }
 function dirtyShards () {
   return SHARD_NAMES.filter(n => JSON.stringify(shardDataOnly(n)) !== _snap[n]);
-}
-function shardBytes (name) {
-  return JSON.stringify(shardDataOnly(name)).length;
 }
 snapshotShards();
 
@@ -1026,179 +1018,86 @@ const isAdmin   = () => currentSession && currentSession.role === 'admin';
 const isAccount = () => currentSession && currentSession.role === 'account';
 
 /* ═══════════════════════════════════════════════════════════════════
-   SYNC — sharded JSONBin store
+   SYNC — Firebase Firestore
    ═══════════════════════════════════════════════════════════════════ */
 const Sync = {
   status: 'idle',
   lastPull: null,
   lastPush: null,
   lastError: null,
-  mode: 'sharded',              // 'sharded' | 'single' (legacy fallback)
+  mode: 'firestore',
   _inFlight: false,
   _pushTimer: null,
-  _pollTimer: null,
   _bootstrapped: false,
   _pending: new Set(),
-  _warned: {},
+  _unsubs: [],
   _lastVisPull: 0,
-  _shards: {},                  // name → binId
-  _manifestTs: {},              // name → lastModified known in cloud
-  _manifestChecked: 0,
+  _fbPromise: null,
 
-  headers () {
-    return { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY };
-  },
   setStatus (s) { this.status = s; updateSyncIndicator(); },
 
-  /* ── low level ── */
-  async _get (binId) {
-    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}/latest`, {
-      method: 'GET',
-      headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' },
-      cache: 'no-store',
-    });
-    if (!r.ok) {
-      let msg = 'HTTP ' + r.status;
-      try { const b = await r.json(); if (b && b.message) msg = b.message; } catch (e) {}
-      throw new Error(msg);
-    }
-    return r.json();
-  },
-  async _put (binId, payload) {
-    const r = await fetch(`${JSONBIN_BASE}/${encodeURIComponent(binId)}`, {
-      method: 'PUT', headers: this.headers(), body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      let msg = 'HTTP ' + r.status;
-      try { const b = await r.json(); if (b && b.message) msg = b.message; } catch (e) {}
-      throw new Error(msg);
-    }
-    return true;
-  },
-  async _create (payload, name) {
-    const r = await fetch(JSONBIN_BASE, {
-      method: 'POST',
-      headers: { ...this.headers(), 'X-Bin-Name': 'aadhithran-' + name },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      let msg = 'HTTP ' + r.status;
-      try { const b = await r.json(); if (b && b.message) msg = b.message; } catch (e) {}
-      throw new Error(msg);
-    }
-    const j = await r.json();
-    const id = j && j.metadata && j.metadata.id;
-    if (!id) throw new Error('Bin created but no id returned');
-    return id;
+  async _ensureFirebase () {
+    if (this._fbPromise) return this._fbPromise;
+    this._fbPromise = (async () => {
+      const [
+        { initializeApp, getApps, getApp },
+        { getAuth, signInAnonymously, onAuthStateChanged },
+        { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp },
+      ] = await Promise.all([
+        import('https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js'),
+        import('https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js'),
+        import('https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js'),
+      ]);
+      const app  = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
+      const auth = getAuth(app);
+      const fdb  = getFirestore(app);
+      if (!auth.currentUser) {
+        await new Promise((resolve, reject) => {
+          const unsub = onAuthStateChanged(auth,
+            (u) => { unsub(); u ? resolve(u) : signInAnonymously(auth).catch(reject); },
+            (err) => { unsub(); reject(err); });
+        });
+      }
+      return { auth, fdb, doc, getDoc, setDoc, onSnapshot, serverTimestamp };
+    })().catch(err => { this._fbPromise = null; throw err; });
+    return this._fbPromise;
   },
 
-  /* ── manifest ── */
-  async _writeManifest () {
-    const payload = {
-      _app: 'aadhithran-erp', _version: 13,
-      shards: { ...this._shards }, ts: { ...this._manifestTs },
-      _lastModified: Date.now(),
-    };
-    await this._put(JSONBIN_MANIFEST_BIN_ID, payload);
-    this._manifestChecked = Date.now();
-    return true;
-  },
-  async _createAllShards () {
-    const created = {};
-    for (const name of SHARD_NAMES) {
-      const payload = shardPayload(name);
-      const id = await this._create(payload, name);
-      created[name] = id;
-      this._manifestTs[name] = payload._lastModified;
-      DB._shardTs[name] = payload._lastModified;
-      _snap[name] = JSON.stringify(shardDataOnly(name));
-    }
-    this._shards = created;
-    await this._writeManifest();
-    this.mode = 'sharded';
-    return true;
-  },
-  async _migrateFromLegacy (remote, forceReplace) {
-    const remoteTs = remote._lastModified || 0;
-    const localTs = DB._lastModified || 0;
-    if (forceReplace || remoteTs > localTs) {
-      const sess = DB.session;
-      const shardTs = DB._shardTs || {};
-      DB = { ...remote, session: sess, _shardTs: shardTs };
-      normalizeDB();
-      DB.session = sess;
-      localStorage.setItem(LS, JSON.stringify(DB));
-      snapshotShards();
-    }
-    try {
-      await this._createAllShards();
-      this.lastError = null;
-      return true;
-    } catch (e) {
-      this.mode = 'single';
-      this.lastError = 'Shard setup failed: ' + e.message;
-      return false;
-    }
-  },
-  async ensureManifest (force = false, forceReplace = false) {
-    if (this.mode === 'single') return false;
-    if (!force && this._manifestChecked && Date.now() - this._manifestChecked < 15000) return true;
+  _docFor (fb, name) { return fb.doc(fb.fdb, 'shards', name); },
 
-    let rec = null;
-    try { rec = await this._get(JSONBIN_MANIFEST_BIN_ID); }
-    catch (e) { throw new Error('Manifest read failed: ' + e.message); }
-    this._manifestChecked = Date.now();
-
-    if (rec && rec._app === 'aadhithran-erp' && rec.shards && typeof rec.shards === 'object') {
-      this._shards = rec.shards;
-      this._manifestTs = rec.ts || {};
-      this.mode = 'sharded';
-      return true;
-    }
-    if (rec && Array.isArray(rec.employees) && rec.employees.length) {
-      return await this._migrateFromLegacy(rec, forceReplace);
-    }
-    // Cloud is empty → build the shards from local data
-    try { await this._createAllShards(); }
-    catch (e) { this.mode = 'single'; this.lastError = 'Shard setup failed: ' + e.message; return false; }
-    return true;
+  async _readShard (fb, name) {
+    const snap = await fb.getDoc(this._docFor(fb, name));
+    return snap.exists() ? snap.data() : null;
   },
 
-  /* ── pull ── */
+  async _writeShard (fb, name) {
+    const payload = { ...shardDataOnly(name), _lastModified: Date.now(), updatedAt: fb.serverTimestamp() };
+    await fb.setDoc(this._docFor(fb, name), payload);
+    DB._shardTs[name] = payload._lastModified;
+    _snap[name] = JSON.stringify(shardDataOnly(name));
+    this._pending.delete(name);
+  },
+
+  /* ── pull (used on boot and on manual "Pull" button) ── */
   async pull (silent = false, forceReplace = false) {
     if (this._inFlight) return 'busy';
     this._inFlight = true;
     this.setStatus('pulling');
     try {
-      if (this.mode === 'single') return await this._pullSingle(silent, forceReplace);
-
-      let ready = false;
-      try { ready = await this.ensureManifest(true, forceReplace); }
-      catch (e) {
-        this.lastError = e.message;
-        this.setStatus('error');
-        if (!silent) toast('Pull failed: ' + e.message, { success: false });
-        return 'failed';
-      }
-      if (this.mode === 'single') return await this._pullSingle(silent, forceReplace);
-      if (!ready) { this.setStatus('error'); return 'failed'; }
-
-      const localTs = DB._shardTs;
-      const toFetch = SHARD_NAMES.filter(n =>
-        this._shards[n] && (forceReplace || (this._manifestTs[n] || 0) > (localTs[n] || 0))
-      );
-
+      const fb = await this._ensureFirebase();
+      const localTs = DB._shardTs || {};
       let changed = false;
-      for (const n of toFetch) {
-        try {
-          const rec = await this._get(this._shards[n]);
-          if (rec && applyShard(n, rec)) {
-            localTs[n] = rec._lastModified || this._manifestTs[n] || Date.now();
+
+      for (const n of SHARD_NAMES) {
+        const remote = await this._readShard(fb, n);
+        if (!remote) continue;
+        const remoteTs = remote._lastModified || 0;
+        if (forceReplace || remoteTs > (localTs[n] || 0)) {
+          if (applyShard(n, remote)) {
+            localTs[n] = remoteTs;
             changed = true;
-          } else if (rec) {
-            localTs[n] = rec._lastModified || this._manifestTs[n] || Date.now();
           }
-        } catch (e) { /* one bad shard should not kill the pull */ }
+        }
       }
 
       if (changed) {
@@ -1222,19 +1121,15 @@ const Sync = {
     } finally { this._inFlight = false; }
   },
 
-  /* ── push ── */
+  /* ── push (called by save() indirectly) ── */
   queuePush (names) {
     (names || []).forEach(n => { if (SHARD_DEFS[n]) this._pending.add(n); });
-    if (!this._bootstrapped) return;
-    if (!this._pending.size) return;
+    if (!this._bootstrapped || !this._pending.size) return;
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this.push(false), PUSH_DEBOUNCE);
   },
+
   async push (force = false) {
-    if (!this._bootstrapped && !force) {
-      if (!this._pending.size) SHARD_NAMES.forEach(n => this._pending.add(n));
-      return 'deferred';
-    }
     if (this._inFlight) {
       if (this._pushTimer) clearTimeout(this._pushTimer);
       this._pushTimer = setTimeout(() => this.push(force), 1800);
@@ -1247,47 +1142,18 @@ const Sync = {
     this._pushTimer = null;
     this.setStatus('pushing');
     try {
-      if (this.mode === 'single') return await this._pushSingle(force);
-
-      if (!this._shards || !this._shards.people) {
-        const ok = await this.ensureManifest(true, false).catch(() => false);
-        if (this.mode === 'single') return await this._pushSingle(force);
-        if (!ok) throw new Error(this.lastError || 'Cloud not ready');
-      }
-
+      const fb = await this._ensureFirebase();
       const failed = [];
       for (const n of names) {
-        const binId = this._shards[n];
-        if (!binId) continue;
-        const payload = shardPayload(n);
-        const bytes = JSON.stringify(payload).length;
-
-        if (bytes > SHARD_WARN_BYTES && !this._warned[n]) {
-          this._warned[n] = true;
-          toast(`${SHARD_DEFS[n].label} data is ${kb(bytes)} — close to the 100 KB cloud limit`, { success:false });
-        }
-        if (bytes > SHARD_HARD_LIMIT) {
-          failed.push(`${SHARD_DEFS[n].label} is ${kb(bytes)} (over 100 KB)`);
-          continue;
-        }
-        try {
-          await this._put(binId, payload);
-          DB._shardTs[n] = payload._lastModified;
-          this._manifestTs[n] = payload._lastModified;
-          _snap[n] = JSON.stringify(shardDataOnly(n));
-          this._pending.delete(n);
-        } catch (e) {
-          failed.push(SHARD_DEFS[n].label + ': ' + e.message);
-        }
+        try { await this._writeShard(fb, n); }
+        catch (e) { failed.push(SHARD_DEFS[n].label + ': ' + e.message); }
       }
-      await this._writeManifest().catch(() => {});
-      localStorage.setItem(LS, JSON.stringify(DB));
       this.lastPush = Date.now();
-
+      localStorage.setItem(LS, JSON.stringify(DB));
       if (failed.length) {
         this.lastError = failed.join(' · ');
         this.setStatus('error');
-        if (force) toast('Push failed: ' + failed[0], { success:false });
+        if (force) toast('Push failed: ' + failed[0], { success: false });
         return 'failed';
       }
       this.lastError = null;
@@ -1302,77 +1168,78 @@ const Sync = {
     } finally { this._inFlight = false; }
   },
 
-  /* ── legacy single-record fallback (only used if shards can't be built) ── */
-  async _pullSingle (silent, forceReplace) {
+  /* ── real-time listener: this is what replaces polling ── */
+  async _subscribe () {
+    this._unsubs.forEach(u => { try { u(); } catch(e){} });
+    this._unsubs = [];
     try {
-      const rec = await this._get(JSONBIN_MANIFEST_BIN_ID);
-      if (!rec || !Array.isArray(rec.employees)) {
-        this.lastPull = Date.now(); this.setStatus('synced'); return 'empty';
+      const fb = await this._ensureFirebase();
+      for (const name of SHARD_NAMES) {
+        const unsub = fb.onSnapshot(this._docFor(fb, name), (snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data();
+          const remoteTs = data._lastModified || 0;
+          const localTs = (DB._shardTs || {})[name] || 0;
+          if (remoteTs <= localTs) return; // ignore our own echo
+          if (applyShard(name, data)) {
+            DB._shardTs = DB._shardTs || {};
+            DB._shardTs[name] = remoteTs;
+            normalizeDB();
+            snapshotShards();
+            DB._lastModified = Date.now();
+            localStorage.setItem(LS, JSON.stringify(DB));
+            processRecurring();
+            refreshCurrentScreen();
+          }
+        }, (err) => {
+          this.lastError = err.message;
+          this.setStatus('error');
+        });
+        this._unsubs.push(unsub);
       }
-      const remoteTs = rec._lastModified || 0;
-      const localTs = DB._lastModified || 0;
-      if (forceReplace || remoteTs > localTs) {
-        const sess = DB.session;
-        DB = { ...rec, session: sess, _shardTs: {} };
-        normalizeDB();
-        DB.session = sess;
-        localStorage.setItem(LS, JSON.stringify(DB));
-        snapshotShards();
-        processRecurring();
-        refreshCurrentScreen();
-        if (!silent) toast('Synced from cloud');
-      }
-      this.lastPull = Date.now(); this.lastError = null;
-      this.setStatus('synced');
-      return 'ok';
     } catch (e) {
       this.lastError = e.message;
       this.setStatus('error');
-      if (!silent) toast('Pull failed: ' + e.message, { success: false });
-      return 'failed';
-    }
-  },
-  async _pushSingle (force) {
-    try {
-      const payload = { ...DB, _shardTs: undefined, _lastModified: Date.now() };
-      await this._put(JSONBIN_MANIFEST_BIN_ID, payload);
-      DB._lastModified = payload._lastModified;
-      localStorage.setItem(LS, JSON.stringify(DB));
-      this.lastPush = Date.now(); this.lastError = null;
-      this.setStatus('synced');
-      if (force) toast('Pushed to cloud');
-      return 'ok';
-    } catch (e) {
-      this.lastError = e.message;
-      this.setStatus('error');
-      if (force) toast('Push failed: ' + e.message, { success: false });
-      return 'failed';
     }
   },
 
-  /* ── lifecycle ── */
-  startPolling () {
-    this.stopPolling();
-    this._pollTimer = setInterval(() => {
-      if (document.visibilityState === 'visible') this.pull(true);
-    }, SYNC_INTERVAL);
-  },
-  stopPolling () {
-    if (this._pollTimer) clearInterval(this._pollTimer);
-    this._pollTimer = null;
-  },
+  /* ── boot ── */
   async bootstrap () {
-    try { await this.ensureManifest(true, isFreshSeed); }
-    catch (e) { this.lastError = e.message; }
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await this._ensureFirebase();
+        await this.pull(true, isFreshSeed);
+        isFreshSeed = false;
 
-    await this.pull(true, isFreshSeed);
-    isFreshSeed = false;
-    this._bootstrapped = true;
-
-    dirtyShards().forEach(n => this._pending.add(n));
-    if (this._pending.size) this.queuePush([]);
-    this.startPolling();
+        // Fill in shards that don't exist yet in the cloud.
+        const fb = await this._ensureFirebase();
+        const missing = [];
+        for (const n of SHARD_NAMES) {
+          const remote = await this._readShard(fb, n);
+          if (!remote) missing.push(n);
+          else if ((remote._lastModified || 0) > ((DB._shardTs || {})[n] || 0) && applyShard(n, remote)) {
+            DB._shardTs[n] = remote._lastModified;
+          }
+        }
+        if (missing.length) {
+          normalizeDB(); snapshotShards();
+          missing.forEach(n => this._pending.add(n));
+          await this.push(true);
+        }
+        this._bootstrapped = true;
+        await this._subscribe();
+        this.setStatus('synced');
+        return;
+      } catch (e) {
+        this.lastError = e.message;
+        this.setStatus('error');
+        if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+      }
+    }
   },
+
+  startPolling () { /* replaced by onSnapshot */ },
+  stopPolling  () { this._unsubs.forEach(u => { try { u(); } catch(e){} }); this._unsubs = []; },
 };
 
 function updateSyncIndicator () {
@@ -1394,7 +1261,7 @@ function updateSyncIndicator () {
 
 async function backupNow () {
   try {
-    const payload = { _app:'aadhithran-erp', _version:13, _exported:new Date().toISOString(), data: DB };
+    const payload = { _app:'aadhithran-erp', _version:14, _exported:new Date().toISOString(), data: DB };
     const json = JSON.stringify(payload, null, 2);
     const stamp = new Date().toISOString().slice(0,10);
     const filename = 'aadhithran-backup-' + stamp + '.json';
@@ -1730,7 +1597,7 @@ function renderHome () {
 
   const kpis = isAcc ? [
     { cls:'blue', ic:'i-money', l:'Revenue', v:s.revenue, sub:'From production', f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
-    { cls:'purple', ic:'i-wallet', l:'Wages', v:s.cost, sub:'Paid to operators', f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
+    { cls:'purple', ic:'i-money', l:'Wages', v:s.cost, sub:'Paid to operators', f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
     { cls:'orange', ic:'i-expense', l:'Expenses', v:s.expenseTotal, sub:`${s.expenses.length} entries`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
     { cls:s.net >= 0 ? 'teal' : 'red', ic:'i-pnl', l:'Net Profit', v:s.net, sub:`${s.margin.toFixed(1)}% margin`, f:n => (n<0?'-₹':'₹') + Math.round(Math.abs(n)).toLocaleString('en-IN') },
   ] : [
@@ -3427,22 +3294,7 @@ function openSettingsSheet () {
   const days = !META.lastBackup ? Infinity : Math.floor((Date.now() - META.lastBackup) / 86400000);
   const backupLabel = days === Infinity ? 'Never' : days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago';
   const statusLabel = { idle:'Ready', pulling:'Pulling…', pushing:'Pushing…', synced:'Synced', error:'Error: ' + (Sync.lastError || 'unknown') }[Sync.status] || Sync.status;
-
-  const shardRows = SHARD_NAMES.map(n => {
-    const bytes = shardBytes(n);
-    const pct = Math.min(100, Math.round((bytes / SHARD_HARD_LIMIT) * 100));
-    const linked = Sync._shards && Sync._shards[n];
-    const ts = (DB._shardTs || {})[n];
-    const colour = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--gold)' : 'var(--emerald-dk)';
-    return `
-      <div class="shard-row" style="display:block">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="sr-l">${SHARD_DEFS[n].label}${linked ? '' : ' <span style="color:var(--red);font-weight:800">· not linked</span>'}</span>
-          <span class="sr-r" style="color:${colour}">${kb(bytes)}${ts ? ' · ' + timeShort(ts) : ''}</span>
-        </div>
-        <div class="shard-bar"><i style="width:${pct}%;background:${colour}"></i></div>
-      </div>`;
-  }).join('');
+  const realtimeLabel = Sync._unsubs.length ? '🟢 Connected' : '⚪ Not connected';
 
   const pinSection = isAdmin()
     ? `<div class="field"><label>Admin PIN</label><button class="btn gray sm" id="changeAdminPin" style="width:100%">Change Admin PIN</button><div class="hint">Account PIN can only be changed by the Account user.</div></div>`
@@ -3452,20 +3304,17 @@ function openSettingsSheet () {
     <div class="field">
       <label>Cloud Sync Status</label>
       <div style="padding:14px;background:var(--surface-2);border-radius:12px">
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Mode</span><b>${Sync.mode === 'single' ? 'Single record (fallback)' : 'Sharded · 5 bins'}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Backend</span><b>Firebase Firestore</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">State</span><b>${escapeHtml(statusLabel)}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Real-time</span><b>${realtimeLabel}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px"><span style="color:var(--text-3)">Last pull</span><b>${Sync.lastPull ? timeShort(Sync.lastPull) : '—'}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span style="color:var(--text-3)">Last push</span><b>${Sync.lastPush ? timeShort(Sync.lastPush) : '—'}</b></div>
       </div>
-    </div>
-    <div class="field">
-      <label>Cloud Shards (100 KB limit each)</label>
-      <div style="padding:12px 14px;background:var(--surface-2);border-radius:12px">${shardRows}</div>
-      <div class="hint">Only shards that change are uploaded, so the whole database never touches the limit at once.</div>
+      <div class="hint">Only shards that changed are uploaded. Real-time listeners keep every device in sync instantly.</div>
     </div>
     <div class="field">
       <label>Manual Sync</label>
-      <button class="btn blue" id="syncPullBtn" style="margin-bottom:8px">${icon('i-cloud-down')} Pull</button>
+      <button class="btn blue" id="syncPullBtn" style="margin-bottom:8px">${icon('i-cloud-down')} Pull from cloud</button>
       <button class="btn emerald" id="syncPushBtn">${icon('i-cloud-up')} Push all shards</button>
     </div>
     <div class="field">
@@ -3541,8 +3390,7 @@ $('#exportPdfBtn').addEventListener('click', () => window.print());
 attachRipple();
 updateSyncIndicator();
 
-/* First boot: read the manifest, migrate the old single record if needed,
-   then hydrate only the shards that are newer than what we hold locally. */
+/* Boot: connect to Firestore, pull latest shards, start live listeners. */
 Sync.bootstrap().catch(() => {});
 
 /* Recurring expenses are checked every minute while the app is open. */
@@ -3555,7 +3403,7 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-/* Coming back to the app: refresh once a minute at most (1 request per pull). */
+/* Coming back to the app: refresh once a minute at most (safety net — onSnapshot handles the rest). */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   const created = processRecurring();
