@@ -449,15 +449,53 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 @keyframes heroPulse{0%,100%{box-shadow:0 12px 30px -10px rgba(15,118,110,.55)}50%{box-shadow:0 16px 42px -8px rgba(15,118,110,.78)}}
 @keyframes fabPop{0%{transform:scale(0) rotate(-90deg)}70%{transform:scale(1.12) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
 
-@media print{
-  body{background:#fff;overflow:visible}
-  .app-header,.tabbar,.fab,.filter-bar,.custom-date-row,.active-filter-strip,.share-btn,#exportPdfBtn,.reports-top-pad,.month-nav{display:none !important}
-  .screens{padding:0;overflow:visible}
-  .screen:not(.active){display:none !important}
-  #reportContent{padding:0}
-  .grid-scroll{overflow:visible}
-  .grid-table th{background:#0F766E !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .grid-table td.has-val{background:#D1FAE5 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+/* ===== FIXED PRINT STYLES ===== */
+@media print {
+  html, body {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  #app {
+    position: static !important;
+    display: block !important;
+    height: auto !important;
+    max-width: none !important;
+    background: #fff !important;
+  }
+  .screens {
+    overflow: visible !important;
+    height: auto !important;
+    padding-bottom: 0 !important;
+  }
+  .screen { display: none !important; }
+  .screen.active { display: block !important; }
+  .app-header, .tabbar, .fab, .filter-bar, .custom-date-row,
+  .active-filter-strip, .share-btn, #exportPdfBtn, .reports-top-pad,
+  .month-nav, .sheet, .sheet-bg, .toast, .success-overlay, .login,
+  .hint, #navBack, #navShare { display: none !important; }
+  .grid-scroll { overflow: visible !important; margin: 0 8mm 6mm !important; }
+  .grid-table { font-size: 9px !important; }
+  .grid-table th {
+    background: #0F766E !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .grid-table td.has-val {
+    background: #D1FAE5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .report-hero, .pnl-card, .salary-section, .report-table,
+  .entry-hero, .amt-preview, .kpi-card, .hero {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    page-break-inside: avoid;
+  }
+  @page { size: A4; margin: 12mm; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -646,33 +684,22 @@ input,select,textarea{background:none;border:none;outline:none;color:var(--text)
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
-   AADHITHRAN ERP — v14 (Firebase Firestore backend · GitHub-Pages ready)
+   AADHITHRAN ERP — v15 (Firebase Firestore · merge-safe sync)
    ───────────────────────────────────────────────────────────────────
-   • localStorage is the source of truth for the UI (offline-first).
-   • Cloud: Firestore, 5 documents at shards/{people|catalog|production|finance|config}.
-   • Auth:  Anonymous Firebase auth (silent, no UI change).
-   • Real-time: onSnapshot pushes changes to every open tab/device instantly.
-   • Writes: debounced (3 s), only dirty shards uploaded.
+   • localStorage-first UI, Firestore sharded cloud (5 docs).
+   • Per-record _updatedAt + tombstones + transactional merge-on-write
+     → no more data erasing between two users.
+   • Real-time onSnapshot + debounced writes (3s) + catch-up recurring.
 
-   Firebase setup (one-time, in Firebase console → garment-erp-d92aa):
-     1. Authentication → Sign-in method → enable Anonymous
-     2. Firestore Database → Create database
-     3. Firestore → Rules:
-          rules_version = '2';
-          service cloud.firestore {
-            match /databases/{db}/documents {
-              match /shards/{shard} {
-                allow read, write: if request.auth != null;
-              }
-            }
-          }
-     4. Authentication → Settings → Authorized domains: add <user>.github.io
+   Firebase setup (one-time):
+     Auth → enable Anonymous · Firestore → create db
+     Rules → deploy the block in README below
+     Auth → Authorized domains → add <your-username>.github.io
    ═══════════════════════════════════════════════════════════════════ */
 
-const LS = 'aadhithran_erp_v12';
-const META_LS = 'aadhithran_meta_v12';
+const LS = 'aadhithran_erp_v13';
+const META_LS = 'aadhithran_meta_v13';
 
-/* ─── Firebase credentials (public keys — safe to include) ─────── */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDly6HdphWPCHZUqYjYUzb9upO0mQmYmvI",
   authDomain: "garment-erp-d92aa.firebaseapp.com",
@@ -731,6 +758,70 @@ function av (k) { if (!_avMap[k]) _avMap[k] = _avColors[Object.keys(_avMap).leng
 function uid (p='id') { return p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
+/* ═══════════════════════════════════════════════════════════════════
+   MERGE-SAFE SYNC HELPERS  (v15 core fix)
+   ═══════════════════════════════════════════════════════════════════ */
+function stampNow () { return Date.now(); }
+
+function mergeArray (local, remote) {
+  const map = new Map();
+  (local  || []).forEach(r => { if (r && r.id) map.set(r.id, r); });
+  (remote || []).forEach(r => {
+    if (!r || !r.id) return;
+    const ex = map.get(r.id);
+    if (!ex) { map.set(r.id, r); return; }
+    if ((Number(r._updatedAt) || 0) > (Number(ex._updatedAt) || 0)) map.set(r.id, r);
+  });
+  return [...map.values()];
+}
+
+function mergeTombs (localTombs, remoteTombs) {
+  const map = new Map();
+  (localTombs  || []).forEach(t => { if (t && t.id) map.set(t.id, t); });
+  (remoteTombs || []).forEach(t => {
+    if (!t || !t.id) return;
+    const ex = map.get(t.id);
+    if (!ex || (Number(t.at) || 0) > (Number(ex.at) || 0)) map.set(t.id, t);
+  });
+  return [...map.values()];
+}
+
+function hardDelete (key, id) {
+  const arr = DB[key] || [];
+  if (!arr.some(r => r.id === id)) return;
+  DB[key] = arr.filter(r => r.id !== id);
+  DB._tombs = DB._tombs || {};
+  DB._tombs[key] = mergeTombs(DB._tombs[key] || [], [{ id, at: stampNow() }]);
+  // Prune tombstones older than 90 days
+  const cutoff = stampNow() - 90 * 86400000;
+  DB._tombs[key] = DB._tombs[key].filter(t => (Number(t.at) || 0) > cutoff);
+}
+
+function markDirtyRecords () {
+  const now = stampNow();
+  SHARD_NAMES.forEach(n => {
+    const def = SHARD_DEFS[n]; if (!def) return;
+    let snap; try { snap = JSON.parse(_snap[n] || '{}'); } catch { snap = {}; }
+    def.keys.forEach(k => {
+      const curr = DB[k];
+      if (!Array.isArray(curr)) return;
+      const prev = Array.isArray(snap[k]) ? snap[k] : [];
+      const prevMap = new Map(); prev.forEach(r => { if (r && r.id) prevMap.set(r.id, r); });
+      curr.forEach(r => {
+        if (!r || !r.id) return;
+        const ex = prevMap.get(r.id);
+        if (!ex) { r._updatedAt = now; return; }
+        const a = { ...ex, _updatedAt: 0 };
+        const b = { ...r,  _updatedAt: 0 };
+        if (JSON.stringify(a) !== JSON.stringify(b)) r._updatedAt = now;
+      });
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STAFF RATE HELPERS
+   ═══════════════════════════════════════════════════════════════════ */
 function staffHourlyRate (s) {
   const hrs = Number(s.hoursPerDay) || 8;
   const days = Number(s.daysPerMonth) || 26;
@@ -740,6 +831,7 @@ function staffHourlyRate (s) {
 }
 function staffHoursToday (staffId) { const t = todayISO(); return DB.staffHours.find(h => h.staffId === staffId && h.date === t); }
 function staffMonthTotal (staffId, month) { return DB.staffHours.filter(h => h.staffId === staffId && h.date.slice(0,7) === month).reduce((a,b) => a + (Number(b.amount) || 0), 0); }
+
 function saveStaffHours (staffId, date, hours, note) {
   const s = DB.companyStaff.find(x => x.id === staffId);
   if (!s) return null;
@@ -748,24 +840,28 @@ function saveStaffHours (staffId, date, hours, note) {
   const amount = rate * h;
   const prev = DB.staffHours.find(x => x.staffId === staffId && x.date === date);
   if (prev) {
-    DB.staffHours = DB.staffHours.filter(x => x.id !== prev.id);
-    DB.expenses = DB.expenses.filter(e => e._staffHoursId !== prev.id);
+    hardDelete('staffHours', prev.id);
+    const linked = DB.expenses.filter(e => e._staffHoursId === prev.id).map(e => e.id);
+    linked.forEach(eid => hardDelete('expenses', eid));
   }
   if (h <= 0) return null;
-  const rec = { id: uid('sh'), staffId: s.id, staffName: s.name, date, hours: h, hourlyRate: rate, amount, note: note || '', ts: Date.now() };
+  const rec = { id: uid('sh'), staffId: s.id, staffName: s.name, date, hours: h, hourlyRate: rate, amount, note: note || '', ts: Date.now(), _updatedAt: Date.now() };
   DB.staffHours.push(rec);
   DB.expenses.push({
     id: uid('e'), date, ts: Date.now(), category: 'Salary', amount,
     note: `${s.name} · ${h}h × ₹${rate.toFixed(2)}/h${note ? ' · ' + note : ''}`,
-    _staffHoursId: rec.id, auto: true,
+    _staffHoursId: rec.id, auto: true, _updatedAt: Date.now(),
   });
   return rec;
 }
+
 function deleteStaffHours (id) {
-  DB.staffHours = DB.staffHours.filter(x => x.id !== id);
-  DB.expenses = DB.expenses.filter(e => e._staffHoursId !== id);
+  hardDelete('staffHours', id);
+  const linked = DB.expenses.filter(e => e._staffHoursId === id).map(e => e.id);
+  linked.forEach(eid => hardDelete('expenses', eid));
   save();
 }
+
 function advanceOutstanding (personType, personId) {
   return DB.advances.filter(a => a.personType === personType && a.personId === personId && !a.settled).reduce((s, a) => s + (Number(a.amount) || 0), 0);
 }
@@ -776,18 +872,23 @@ function toggleAdvanceSettled (id) {
   const a = DB.advances.find(x => x.id === id);
   if (!a) return;
   a.settled = !a.settled;
+  a._updatedAt = Date.now();
   save(); showSuccess(); toast(a.settled ? 'Marked settled' : 'Marked outstanding');
   if (currentReport === 'advance') renderReportContent();
 }
 window.toggleAdvanceSettled = toggleAdvanceSettled;
+
 function deleteAdvance (id) {
   if (!confirm('Delete this advance entry?')) return;
-  DB.advances = DB.advances.filter(x => x.id !== id);
+  hardDelete('advances', id);
   save(); showSuccess(); toast('Deleted');
   if (currentReport === 'advance') renderReportContent();
 }
 window.deleteAdvance = deleteAdvance;
 
+/* ═══════════════════════════════════════════════════════════════════
+   RECURRING  (v15: catch-up loop, no missed days)
+   ═══════════════════════════════════════════════════════════════════ */
 function nextRunHint (r) {
   const start = new Date(r.startDate + 'T00:00:00');
   if (r.frequency === 'daily') return 'Every day';
@@ -798,37 +899,75 @@ function nextRunHint (r) {
   }
   return '—';
 }
+
 function processRecurring () {
   const today = todayISO();
   const todayDate = new Date(today + 'T00:00:00');
   let created = 0;
   DB.recurring.filter(r => r.active).forEach(r => {
-    const exists = DB.expenses.some(e => e._recurringId === r.id && e.date === today);
-    if (exists) return;
     const start = new Date(r.startDate + 'T00:00:00');
+    const end = r.endDate ? new Date(r.endDate + 'T00:00:00') : null;
     if (todayDate < start) return;
-    if (r.endDate) { const end = new Date(r.endDate + 'T00:00:00'); if (todayDate > end) return; }
-    let shouldCreate = false;
-    if (r.frequency === 'daily') shouldCreate = true;
-    else if (r.frequency === 'weekly') shouldCreate = (todayDate.getDay() === start.getDay());
-    else if (r.frequency === 'monthly') {
-      const startDay = start.getDate();
-      const lastDay = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate();
-      shouldCreate = (todayDate.getDate() === Math.min(startDay, lastDay));
+    if (end && todayDate > end) return;
+
+    const datesToCreate = [];
+
+    if (r.frequency === 'daily') {
+      // 7-day catch-up window
+      const lookback = new Date(todayDate.getTime() - 7 * 86400000);
+      const cursor = start > lookback ? start : lookback;
+      for (let d = new Date(cursor); d <= todayDate; d.setDate(d.getDate() + 1)) {
+        const ds = isoLocal(d);
+        if (end && d > end) break;
+        if (!DB.expenses.some(e => e._recurringId === r.id && e.date === ds)) datesToCreate.push(ds);
+      }
+    } else if (r.frequency === 'weekly') {
+      // 4-week catch-up
+      for (let wk = 0; wk < 4; wk++) {
+        const d = new Date(todayDate); d.setDate(d.getDate() - wk * 7);
+        if (d.getDay() !== start.getDay()) continue;
+        if (d < start) break;
+        if (end && d > end) break;
+        const ds = isoLocal(d);
+        if (!DB.expenses.some(e => e._recurringId === r.id && e.date === ds)) datesToCreate.push(ds);
+      }
+    } else if (r.frequency === 'monthly') {
+      // 3-month catch-up
+      for (let mo = 0; mo < 3; mo++) {
+        const d = new Date(todayDate.getFullYear(), todayDate.getMonth() - mo, 1);
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        const target = Math.min(start.getDate(), lastDay);
+        if (d.getFullYear() === todayDate.getFullYear() && d.getMonth() === todayDate.getMonth()) {
+          if (todayDate.getDate() < target) continue;
+        }
+        const targetDate = new Date(d.getFullYear(), d.getMonth(), target);
+        if (targetDate > todayDate) continue;
+        if (targetDate < start) break;
+        if (end && targetDate > end) break;
+        const ds = isoLocal(targetDate);
+        if (!DB.expenses.some(e => e._recurringId === r.id && e.date === ds)) datesToCreate.push(ds);
+      }
     }
-    if (!shouldCreate) return;
-    DB.expenses.push({
-      id: uid('e'), date: today, ts: Date.now(), category: r.category,
-      amount: Number(r.amount) || 0, note: r.note || (r.category + ' (auto)'),
-      _recurringId: r.id, auto: true,
+
+    datesToCreate.forEach(ds => {
+      DB.expenses.push({
+        id: uid('e'), date: ds, ts: Date.now(), category: r.category,
+        amount: Number(r.amount) || 0,
+        note: r.note || (r.category + ' (auto)'),
+        _recurringId: r.id, auto: true, _updatedAt: Date.now(),
+      });
+      created++;
     });
-    created++;
   });
   if (created > 0) { save(); return created; }
   return 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   SEED
+   ═══════════════════════════════════════════════════════════════════ */
 function seed () {
+  const now = Date.now();
   const employees = [
     { id:'EMP-001', name:'Mary',          line:'L-01', skill:'Tailor', status:'Active', joined:'2026-09-29' },
     { id:'EMP-002', name:'Shiva Shakthi', line:'L-01', skill:'Tailor', status:'Active', joined:'2026-09-29' },
@@ -855,6 +994,8 @@ function seed () {
     { id:'EMP-023', name:'Deepa',         line:'L-02', skill:'Tailor', status:'Active', joined:'2026-09-29' },
     { id:'EMP-024', name:'Manjula',       line:'L-01', skill:'Tailor', status:'Active', joined:'2026-09-29' },
   ];
+  employees.forEach(r => r._updatedAt = now);
+
   const bundles = [
     { id:'b_mum7oysra32c9', name:'Plain bag', style:'', sellingPrice:0, _draft:false, created:1790658258219,
       ops:[ { opId:'op_mumhzpefo866e', name:'Hemming', rate:0.85 }, { opId:'op_mumhzpefcwnk9', name:'Overlock', rate:0.45 } ] },
@@ -882,7 +1023,11 @@ function seed () {
     { id:'b_mumnu1a94o9gp', name:'Folder', style:'', sellingPrice:0, _draft:false, created:1790685368578,
       ops:[ { opId:'op_mumnu1a9tg93x', name:'Shift', rate:300 } ] },
   ];
+  bundles.forEach(r => r._updatedAt = now);
+
   const masterOps = [ { id:'op_mum7ogxbmtnpg', name:'Humming', desc:'', rate:0.85 } ];
+  masterOps.forEach(r => r._updatedAt = now);
+
   const production = [
     { id:'p_mumi8g7t89vc2', date:'2026-09-29', ts:1790675963418, empId:'EMP-011', operatorName:'Janagie',       line:'L-01', bundleId:'b_mumi4kiwzplrv', bundleName:'Apron',      operation:'Apron pocket attachment', rate:1.2, qty:120,  reject:0, rejectReason:'', amount:144,   notes:'' },
     { id:'p_mummkz2jzygh0', date:'2026-09-29', ts:1790683266187, empId:'EMP-018', operatorName:'Nithya',        line:'L-02', bundleId:'b_mum7oysra32c9', bundleName:'Plain bag', operation:'Hemming',                 rate:0.85, qty:300,  reject:0, rejectReason:'', amount:255,   notes:'' },
@@ -901,6 +1046,8 @@ function seed () {
     { id:'p_mumpg9tlfllsr', date:'2026-09-29', ts:1790688085689, empId:'EMP-014', operatorName:'Parimala',      line:'L-01', bundleId:'b_mum7oysra32c9', bundleName:'Plain bag', operation:'Hemming',                 rate:0.85, qty:560,  reject:0, rejectReason:'', amount:476,   notes:'' },
     { id:'p_mumq7wq8gykqy', date:'2026-09-29', ts:1790689375088, empId:'EMP-021', operatorName:'Mahalaxmi',     line:'L-02', bundleId:'b_mum7oysra32c9', bundleName:'Plain bag', operation:'Overlock',                rate:0.45, qty:1600, reject:0, rejectReason:'', amount:720,   notes:'' },
   ];
+  production.forEach(r => r._updatedAt = now);
+
   const companyStaff = [
     { id:'cs_mumhyg2u69vzb', name:'Eiswer',    role:'Supervisor', salary:12500, hoursPerDay:8, daysPerMonth:26 },
     { id:'cs_mumhyn9rrtgof', name:'Keerthana', role:'Helper',     salary:7000,  hoursPerDay:8, daysPerMonth:26 },
@@ -908,14 +1055,17 @@ function seed () {
     { id:'cs_mumhz071grm3k', name:'Thenmozhi', role:'Helper',     salary:7000,  hoursPerDay:8, daysPerMonth:26 },
     { id:'cs_mumhz90vutakl', name:'Jothi',     role:'Helper',     salary:7000,  hoursPerDay:8, daysPerMonth:26 },
   ];
+  companyStaff.forEach(r => r._updatedAt = now);
+
   return {
     employees, bundles, masterOps, production,
     expenses: [], advances: [],
     recents: ['EMP-021', 'EMP-014', 'EMP-008'],
     companyStaff, staffHours: [], recurring: [],
-    admin:   { pin:'1234', name:'Admin' },
-    account: { pin:'1605', name:'Account' },
-    session: null, version: 14, _lastModified: Date.now(), _shardTs: {},
+    admin:   { pin:'1234', name:'Admin',   _updatedAt: now },
+    account: { pin:'1605', name:'Account', _updatedAt: now },
+    session: null, version: 15, _lastModified: now, _shardTs: {},
+    _tombs: {},
   };
 }
 
@@ -935,27 +1085,74 @@ function normalizeDB () {
   DB.staffHours = Array.isArray(DB.staffHours) ? DB.staffHours : [];
   DB.recurring = Array.isArray(DB.recurring) ? DB.recurring.map(r => ({ ...r, amount: Number(r.amount) || 0, frequency: RECUR_FREQ.includes(r.frequency) ? r.frequency : 'daily', active: r.active !== false, startDate: r.startDate || todayISO() })) : [];
   DB.advances = Array.isArray(DB.advances) ? DB.advances.map(a => ({ ...a, amount: Number(a.amount) || 0, settled: a.settled === true })) : [];
-  DB.admin = DB.admin || { pin:'1234', name:'Admin' };
-  DB.account = DB.account || { pin:'1605', name:'Account' };
+  DB.admin = DB.admin || { pin:'1234', name:'Admin', _updatedAt: Date.now() };
+  DB.account = DB.account || { pin:'1605', name:'Account', _updatedAt: Date.now() };
   DB.session = DB.session || null;
-  DB.version = 14;
+  DB.version = 15;
   DB._lastModified = DB._lastModified || Date.now();
   DB._shardTs = (DB._shardTs && typeof DB._shardTs === 'object') ? DB._shardTs : {};
+  DB._tombs = (DB._tombs && typeof DB._tombs === 'object') ? DB._tombs : {};
 }
 normalizeDB();
 
+/* ═══════════════════════════════════════════════════════════════════
+   SHARD SHAPING (with tombstones included)
+   ═══════════════════════════════════════════════════════════════════ */
 const _snap = {};
+
 function shardDataOnly (name) {
   const out = {}; const def = SHARD_DEFS[name];
-  if (def) def.keys.forEach(k => { out[k] = DB[k]; });
+  if (!def) return out;
+  def.keys.forEach(k => { out[k] = DB[k]; });
+  if (DB._tombs) {
+    const tombs = {};
+    def.keys.forEach(k => { if (DB._tombs[k] && DB._tombs[k].length) tombs[k] = DB._tombs[k]; });
+    if (Object.keys(tombs).length) out._tombs = tombs;
+  }
   return out;
 }
+
 function applyShard (name, remote) {
   const def = SHARD_DEFS[name]; if (!def || !remote) return false;
   let changed = false;
-  def.keys.forEach(k => { if (remote[k] !== undefined) { DB[k] = remote[k]; changed = true; } });
+
+  // 1. Apply remote tombstones locally
+  if (remote._tombs) {
+    DB._tombs = DB._tombs || {};
+    Object.keys(remote._tombs).forEach(k => {
+      const incoming = remote._tombs[k] || [];
+      if (!incoming.length) return;
+      DB._tombs[k] = mergeTombs(DB._tombs[k] || [], incoming);
+      const ids = new Set(DB._tombs[k].map(t => t.id));
+      if (DB[k]) {
+        const before = DB[k].length;
+        DB[k] = DB[k].filter(r => !ids.has(r.id));
+        if (DB[k].length !== before) changed = true;
+      }
+      changed = true;
+    });
+  }
+
+  // 2. Merge live records (union by id, newest _updatedAt wins)
+  def.keys.forEach(k => {
+    if (remote[k] === undefined) return;
+    const localV = DB[k], remoteV = remote[k];
+    if (Array.isArray(localV) && Array.isArray(remoteV)) {
+      const tombIds = new Set(((DB._tombs && DB._tombs[k]) || []).map(t => t.id));
+      const filtered = remoteV.filter(r => !tombIds.has(r.id));
+      const merged = mergeArray(localV, filtered);
+      if (JSON.stringify(merged) !== JSON.stringify(localV)) { DB[k] = merged; changed = true; }
+    } else if (localV && remoteV && typeof localV === 'object' && typeof remoteV === 'object') {
+      const lts = Number(localV._updatedAt) || 0;
+      const rts = Number(remoteV._updatedAt) || 0;
+      if (rts > lts) { DB[k] = remoteV; changed = true; }
+    } else if (JSON.stringify(localV) !== JSON.stringify(remoteV)) {
+      DB[k] = remoteV; changed = true;
+    }
+  });
   return changed;
 }
+
 function snapshotShards () { SHARD_NAMES.forEach(n => { _snap[n] = JSON.stringify(shardDataOnly(n)); }); }
 function dirtyShards () { return SHARD_NAMES.filter(n => JSON.stringify(shardDataOnly(n)) !== _snap[n]); }
 snapshotShards();
@@ -980,7 +1177,7 @@ const isAdmin   = () => currentSession && currentSession.role === 'admin';
 const isAccount = () => currentSession && currentSession.role === 'account';
 
 /* ═══════════════════════════════════════════════════════════════════
-   SYNC — Firebase Firestore (real-time onSnapshot)
+   SYNC — Firestore with merge-safe writes
    ═══════════════════════════════════════════════════════════════════ */
 const Sync = {
   status: 'idle',
@@ -1004,7 +1201,7 @@ const Sync = {
       const [
         { initializeApp, getApps, getApp },
         { getAuth, signInAnonymously, onAuthStateChanged },
-        { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp },
+        { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, runTransaction },
       ] = await Promise.all([
         import(`${FIREBASE_CDN}/firebase-app.js`),
         import(`${FIREBASE_CDN}/firebase-auth.js`),
@@ -1020,7 +1217,7 @@ const Sync = {
             (err) => { unsub(); reject(err); });
         });
       }
-      return { auth, fdb, doc, getDoc, setDoc, onSnapshot, serverTimestamp };
+      return { auth, fdb, doc, getDoc, setDoc, onSnapshot, serverTimestamp, runTransaction };
     })().catch(err => { this._fbPromise = null; throw err; });
     return this._fbPromise;
   },
@@ -1033,9 +1230,47 @@ const Sync = {
   },
 
   async _writeShard (fb, name) {
-    const payload = { ...shardDataOnly(name), _lastModified: Date.now(), updatedAt: fb.serverTimestamp() };
-    await fb.setDoc(this._docFor(fb, name), payload);
-    DB._shardTs[name] = payload._lastModified;
+    const def = SHARD_DEFS[name];
+    markDirtyRecords();
+    const local = shardDataOnly(name);
+    const ref = this._docFor(fb, name);
+
+    const merged = await fb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const existing = snap.exists() ? snap.data() : {};
+      const out = {};
+      def.keys.forEach(k => {
+        const lV = local[k], rV = existing[k];
+        if (Array.isArray(lV) && Array.isArray(rV)) {
+          out[k] = mergeArray(lV, rV);
+        } else if (lV !== undefined && rV !== undefined
+                   && typeof lV === 'object' && lV && typeof rV === 'object' && rV) {
+          const lts = Number(lV._updatedAt) || 0;
+          const rts = Number(rV._updatedAt) || 0;
+          out[k] = rts > lts ? rV : lV;
+        } else {
+          out[k] = lV !== undefined ? lV : rV;
+        }
+      });
+      const lT = local._tombs || {}, rT = existing._tombs || {};
+      const tombs = {};
+      Object.keys({ ...lT, ...rT }).forEach(k => {
+        const all = mergeTombs(lT[k], rT[k]);
+        if (all.length) tombs[k] = all;
+      });
+      if (Object.keys(tombs).length) out._tombs = tombs;
+      out._lastModified = Date.now();
+      out.updatedAt = fb.serverTimestamp();
+      tx.set(ref, out);
+      return out;
+    });
+
+    if (applyShard(name, merged)) {
+      normalizeDB();
+      localStorage.setItem(LS, JSON.stringify(DB));
+    }
+    DB._shardTs = DB._shardTs || {};
+    DB._shardTs[name] = merged._lastModified;
     _snap[name] = JSON.stringify(shardDataOnly(name));
     this._pending.delete(name);
   },
@@ -1046,15 +1281,14 @@ const Sync = {
     this.setStatus('pulling');
     try {
       const fb = await this._ensureFirebase();
-      const localTs = DB._shardTs || {};
+      DB._shardTs = DB._shardTs || {};
       let changed = false;
-
       for (const n of SHARD_NAMES) {
         const remote = await this._readShard(fb, n);
         if (!remote) continue;
-        const remoteTs = remote._lastModified || 0;
-        if (forceReplace || remoteTs > (localTs[n] || 0)) {
-          if (applyShard(n, remote)) { localTs[n] = remoteTs; changed = true; }
+        if (applyShard(n, remote)) {
+          DB._shardTs[n] = Math.max(Number(DB._shardTs[n]) || 0, Number(remote._lastModified) || 0);
+          changed = true;
         }
       }
       if (changed) {
@@ -1073,7 +1307,7 @@ const Sync = {
     } catch (e) {
       this.lastError = e.message;
       this.setStatus('error');
-      if (!silent) toast('Pull failed: ' + e.message, { success: false });
+      if (!silent) toast('Pull failed: ' + e.message, { success:false });
       return 'failed';
     } finally { this._inFlight = false; }
   },
@@ -1133,12 +1367,16 @@ const Sync = {
         const unsub = fb.onSnapshot(this._docFor(fb, name), (snap) => {
           if (!snap.exists()) return;
           const data = snap.data();
-          const remoteTs = data._lastModified || 0;
-          const localTs = (DB._shardTs || {})[name] || 0;
-          if (remoteTs <= localTs) return; // ignore our own echo
+          const def = SHARD_DEFS[name];
+          const cmpLocal = {}; const cmpRemote = {};
+          def.keys.forEach(k => { cmpLocal[k] = DB[k]; cmpRemote[k] = data[k]; });
+          const lT = DB._tombs ? Object.fromEntries(def.keys.filter(k => DB._tombs[k]).map(k => [k, DB._tombs[k]])) : {};
+          const rT = data._tombs || {};
+          if (JSON.stringify({ ...cmpLocal, _t: lT }) === JSON.stringify({ ...cmpRemote, _t: rT })) return;
+
           if (applyShard(name, data)) {
             DB._shardTs = DB._shardTs || {};
-            DB._shardTs[name] = remoteTs;
+            DB._shardTs[name] = Number(data._lastModified) || 0;
             normalizeDB();
             snapshotShards();
             DB._lastModified = Date.now();
@@ -1146,10 +1384,7 @@ const Sync = {
             processRecurring();
             refreshCurrentScreen();
           }
-        }, (err) => {
-          this.lastError = err.message;
-          this.setStatus('error');
-        });
+        }, (err) => { this.lastError = err.message; this.setStatus('error'); });
         this._unsubs.push(unsub);
       }
     } catch (e) {
@@ -1162,7 +1397,7 @@ const Sync = {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await this._ensureFirebase();
-        const pullStatus = await this.pull(true, isFreshSeed);
+        const pullStatus = await this.pull(true, false);
         isFreshSeed = false;
 
         if (pullStatus === 'failed') {
@@ -1177,8 +1412,6 @@ const Sync = {
         }
 
         this._bootstrapped = true;
-        
-        // Connect real-time listeners FIRST, so the app is live instantly
         await this._subscribe();
 
         const fb = await this._ensureFirebase();
@@ -1187,17 +1420,15 @@ const Sync = {
           try {
             const remote = await this._readShard(fb, n);
             if (!remote) missing.push(n);
-          } catch (e) { /* skip this shard; retried next save */ }
+          } catch (e) { /* skip */ }
         }
 
         if (missing.length) {
-          // First-time setup: push all shards so the cloud mirrors local.
           normalizeDB();
           snapshotShards();
           missing.forEach(n => this._pending.add(n));
           await this.push(true);
         } else {
-          // Any local-only dirty shards (e.g. closed app before debounce)?
           const dirty = dirtyShards();
           if (dirty.length) {
             dirty.forEach(n => this._pending.add(n));
@@ -1215,7 +1446,7 @@ const Sync = {
     }
   },
 
-  startPolling () { /* replaced by onSnapshot */ },
+  startPolling () { /* onSnapshot */ },
   stopPolling  () { this._unsubs.forEach(u => { try { u(); } catch(e){} }); this._unsubs = []; },
 };
 
@@ -1236,9 +1467,12 @@ function updateSyncIndicator () {
   el.title = map[s] || '';
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   BACKUP / RESTORE  (v15: robust share + download fallback)
+   ═══════════════════════════════════════════════════════════════════ */
 async function backupNow () {
   try {
-    const payload = { _app:'aadhithran-erp', _version:14, _exported:new Date().toISOString(), data: DB };
+    const payload = { _app:'aadhithran-erp', _version:15, _exported:new Date().toISOString(), data: DB };
     const json = JSON.stringify(payload, null, 2);
     const stamp = new Date().toISOString().slice(0,10);
     const filename = 'aadhithran-backup-' + stamp + '.json';
@@ -1251,13 +1485,15 @@ async function backupNow () {
       } catch (err) { if (err && err.name === 'AbortError') return; }
     }
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
     META.lastBackup = Date.now(); persistMeta();
-    showSuccess(); toast('Backup saved');
+    showSuccess(); toast('Backup saved to Downloads');
   } catch (e) { toast('Backup failed: ' + e.message, { success:false }); }
 }
+
 function pickRestoreFile () {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'application/json,.json';
@@ -1278,6 +1514,7 @@ function pickRestoreFile () {
   };
   input.click();
 }
+
 function confirmClearAll () {
   if (!confirm('Delete ALL data on this device AND in the cloud?')) return;
   if (prompt('Type DELETE to confirm:') !== 'DELETE') { toast('Cancelled'); return; }
@@ -1287,6 +1524,9 @@ function confirmClearAll () {
   showSuccess(); toast('Cleared'); closeSheet(); refreshCurrentScreen();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   STATS
+   ═══════════════════════════════════════════════════════════════════ */
 function bundleCostPerPiece (b) { return (b.ops || []).reduce((a,o) => a + (Number(o.rate) || 0), 0); }
 function entryCost (p) { return Number(p.amount) || 0; }
 function entryRevenue (p) {
@@ -1298,6 +1538,7 @@ function entryRevenue (p) {
 }
 
 const filterState = { dateType: 'preset', preset: 'today', from: '', to: '', operatorId: 'all', line: 'all', bundleId: 'all', operation: 'all', category: 'all' };
+
 function resolveDateRange () {
   const today = new Date(); today.setHours(0,0,0,0);
   if (filterState.dateType === 'custom') {
@@ -1330,11 +1571,19 @@ function applyExpenseFilters (rows) {
   if (filterState.category !== 'all') out = out.filter(r => r.category === filterState.category);
   return out;
 }
-function getFilteredStats () {
-  const rows = applyFilters(DB.production);
-  const expenses = applyExpenseFilters(DB.expenses);
+
+function getFilteredStats (todayOnly = false) {
+  let rows, expenses;
+  if (todayOnly) {
+    const t = todayISO();
+    rows = DB.production.filter(r => r.date === t);
+    expenses = DB.expenses.filter(e => e.date === t);
+  } else {
+    rows = applyFilters(DB.production);
+    expenses = applyExpenseFilters(DB.expenses);
+  }
   const pieces = rows.reduce((a,b) => a + b.qty, 0);
-  const rejects = rows.reduce((a,b) => a + b.reject, 0);
+  const rejects = rows.reduce((a,b) => a + (b.reject||0), 0);
   const cost = rows.reduce((a,b) => a + entryCost(b), 0);
   const expenseTotal = expenses.reduce((a,b) => a + (Number(b.amount) || 0), 0);
   const revenue = rows.reduce((a,b) => a + entryRevenue(b), 0);
@@ -1343,6 +1592,9 @@ function getFilteredStats () {
   return { rows, expenses, pieces, rejects, cost, expenseTotal, total: cost + expenseTotal, revenue, net, margin };
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   UI UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
 function toast (msg, opts = {}) {
   const t = $('#toast'); const ok = opts.success !== false;
   t.innerHTML = (ok ? `<span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>` : '') + `<span>${escapeHtml(msg)}</span>`;
@@ -1351,9 +1603,11 @@ function toast (msg, opts = {}) {
   clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove('on'), 2400);
 }
 function haptic (type='light') {
-  if (!navigator.vibrate) return;
-  const d = { light:8, medium:15, heavy:25 }[type];
-  if (d) navigator.vibrate(d); else if (type === 'success') navigator.vibrate([10, 40, 20]);
+  try {
+    if (!navigator.vibrate) return;
+    const d = { light:8, medium:15, heavy:25 }[type];
+    if (d) navigator.vibrate(d); else if (type === 'success') navigator.vibrate([10, 40, 20]);
+  } catch (e) {}
 }
 function addRipple (el, e, dark=false) {
   if (!el) return;
@@ -1375,6 +1629,7 @@ function countUp (el, from, to, dur=700, fmt) {
   requestAnimationFrame(step);
 }
 function showSuccess () { const o = $('#successOverlay'); o.classList.add('on'); haptic('success'); setTimeout(() => o.classList.remove('on'), 820); }
+
 function attachRipple () {
   $$('.btn, .ios-row, .qa, .tab, .qbtn, .qquick button, .report-card, .filter-chip, .op-chip, .bundle-card, .reasons button, .reject-ctrl button, .kpi-card, .share-btn, .login-keypad button, .role-btn, .salary-emp, .chip-row button, .hours-list .hl-del, .month-nav button, .adv-set-chip, .expense-list-item').forEach(el => {
     if (el._rippled) return; el._rippled = true;
@@ -1385,6 +1640,9 @@ function attachRipple () {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   LOGIN
+   ═══════════════════════════════════════════════════════════════════ */
 let loginRole = 'admin';
 let pinBuf = '';
 function updatePinSlots () { $$('#pinSlots .pin-slot').forEach((s, i) => { s.textContent = i < pinBuf.length ? '•' : ''; s.classList.toggle('filled', i < pinBuf.length); }); }
@@ -1417,6 +1675,7 @@ function logout () {
   }, 300);
 }
 window.logout = logout;
+
 $$('#loginKeypad button').forEach(b => b.addEventListener('click', () => {
   const v = b.dataset.num;
   if (v === 'del') pinBuf = pinBuf.slice(0, -1);
@@ -1427,6 +1686,9 @@ $$('#loginKeypad button').forEach(b => b.addEventListener('click', () => {
 }));
 $$('.role-btn').forEach(b => b.addEventListener('click', () => setLoginRole(b.dataset.role)));
 
+/* ═══════════════════════════════════════════════════════════════════
+   APP BOOT
+   ═══════════════════════════════════════════════════════════════════ */
 function bootApp () {
   if (!currentSession) return;
   const acc = isAccount();
@@ -1439,8 +1701,10 @@ function bootApp () {
   if (created > 0) setTimeout(() => toast(created + ' recurring expense' + (created > 1 ? 's' : '') + ' added'), 900);
   nav('home');
 }
+
 const PAGE_TITLES = { home:'Dashboard', work:'Work', bundles:'Bundles', reports:'Reports', team:'Team', reportDetail:'Report' };
 let currentScreen = '';
+
 function nav (sc, opts = {}) {
   const allowed = isAdmin() ? ACCESS.admin : ACCESS.account;
   if (!allowed.includes(sc) && sc !== 'reportDetail') { toast('Access denied', {success:false}); return; }
@@ -1472,18 +1736,23 @@ function nav (sc, opts = {}) {
   if (sc === 'reportDetail') renderReportDetail();
 }
 window.nav = nav;
+
 function refreshCurrentScreen () {
   if (!currentScreen) return;
   if (currentScreen === 'reportDetail') renderReportDetail();
   else nav(currentScreen);
 }
 window.refreshCurrentScreen = refreshCurrentScreen;
+
 $$('.tab').forEach(t => t.addEventListener('click', () => nav(t.dataset.sc)));
 $('#navBack').addEventListener('click', () => { currentReport = null; nav('reports'); });
 $('#navShare').addEventListener('click', () => shareReport());
 $('#fab').addEventListener('click', () => addEntry());
 $('#syncIndicator').addEventListener('click', openSettingsSheet);
 
+/* ═══════════════════════════════════════════════════════════════════
+   SHEET INFRASTRUCTURE
+   ═══════════════════════════════════════════════════════════════════ */
 const sheet = $('#sheet'), sheetBg = $('#sheetBg'), sheetBody = $('#sheetBody'),
       sheetTitle = $('#sheetTitle'), sheetSave = $('#sheetSave'), sheetCancel = $('#sheetCancel');
 let sheetOnSave = null;
@@ -1506,8 +1775,11 @@ sheetSave.addEventListener('click', () => {
 });
 window.closeSheet = closeSheet;
 
+/* ═══════════════════════════════════════════════════════════════════
+   HOME
+   ═══════════════════════════════════════════════════════════════════ */
 function renderHome () {
-  const s = getFilteredStats();
+  const s = getFilteredStats(true);   // ← v15: always today
   const d = new Date();
   $('#pageDate').textContent = d.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
   const isAcc = isAccount();
@@ -1552,7 +1824,7 @@ function renderHome () {
   ] : [
     { cls:'blue', ic:'i-bundle', l:'Output', v:s.pieces, u:'pcs', sub:`${new Set(s.rows.map(x=>x.empId)).size} operators`, f:n => Math.round(n).toLocaleString('en-IN') },
     { cls:'teal', ic:'i-money', l:'Piece Wages', v:s.cost, sub:'Paid to operators', f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
-    { cls:'orange', ic:'i-wallet', l:'Expenses', v:s.expenseTotal, sub:`${s.expenses.length} entr${s.expenses.length===1?'y':'ies'}`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
+    { cls:'orange', ic:'i-expense', l:'Expenses', v:s.expenseTotal, sub:`${s.expenses.length} entr${s.expenses.length===1?'y':'ies'}`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
     { cls:'red', ic:'i-hand', l:'Advance Out', v:outstandingAdv, sub:`${DB.advances.filter(a => !a.settled).length} unsettled`, f:n => '₹' + Math.round(n).toLocaleString('en-IN') },
   ];
   $('#kpis').innerHTML = kpis.map((k, i) => `
@@ -1596,6 +1868,9 @@ function renderHome () {
   attachRipple();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   WORK
+   ═══════════════════════════════════════════════════════════════════ */
 let workFilter = 'today', workSearch = '';
 function renderWork () {
   const recents = DB.recents.map(id => DB.employees.find(e => e.id === id)).filter(Boolean);
@@ -1643,6 +1918,9 @@ function renderWork () {
   attachRipple();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   BUNDLES
+   ═══════════════════════════════════════════════════════════════════ */
 function renderBundles () {
   const list = DB.bundles;
   const acc = isAccount();
@@ -1670,6 +1948,9 @@ function renderBundles () {
   attachRipple();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   REPORTS HOME
+   ═══════════════════════════════════════════════════════════════════ */
 function renderReports () {
   const reports = [
     { id:'monthly',  t:'Monthly Grid', s:'Day-by-day · every person', ic:'i-grid', g:'purple', c:'#7C3AED' },
@@ -1697,6 +1978,9 @@ function grad (g) {
   return { teal:'linear-gradient(135deg,#0F766E,#14B8A6)', blue:'linear-gradient(135deg,#2563EB,#3B82F6)', purple:'linear-gradient(135deg,#7C3AED,#A855F7)', orange:'linear-gradient(135deg,#EA580C,#F59E0B)', red:'linear-gradient(135deg,#DC2626,#EF4444)', emerald:'linear-gradient(135deg,#059669,#10B981)', gold:'linear-gradient(135deg,#D97706,#F59E0B)', gray:'linear-gradient(135deg,#64748B,#94A3B8)', cyan:'linear-gradient(135deg,#0891B2,#06B6D4)', pink:'linear-gradient(135deg,#DB2777,#F472B6)', lime:'linear-gradient(135deg,#65A30D,#84CC16)', rose:'linear-gradient(135deg,#E11D48,#FB7185)' }[g] || 'linear-gradient(135deg,#0F766E,#14B8A6)';
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   TEAM
+   ═══════════════════════════════════════════════════════════════════ */
 let teamTab = 'operators', teamSearch = '';
 function renderTeam () {
   const addBtn = $('#teamAddBtn');
@@ -1751,6 +2035,9 @@ function renderTeam () {
   attachRipple();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   OPERATOR FORM
+   ═══════════════════════════════════════════════════════════════════ */
 function openNewOperator () { openOperatorForm(null); }
 function openOperator (id) { openOperatorForm(DB.employees.find(e => e.id === id)); }
 function openOperatorForm (emp) {
@@ -1785,9 +2072,13 @@ function openOperatorForm (emp) {
     if (!name) { toast('Name is required', {success:false}); return false; }
     if (!isEdit && DB.employees.some(x => x.id === eid)) { toast('Employee ID exists', {success:false}); return false; }
     const status = ($('#opStatus .on') || {}).dataset?.v || 'Active';
-    const rec = { id: eid, name, line: $('#opLine').value, skill: $('#opSkill').value, status, joined: $('#opJoined').value };
-    if (isEdit) DB.employees[DB.employees.findIndex(x => x.id === emp.id)] = { ...DB.employees.find(x => x.id === emp.id), ...rec };
-    else DB.employees.push(rec);
+    const rec = { id: eid, name, line: $('#opLine').value, skill: $('#opSkill').value, status, joined: $('#opJoined').value, _updatedAt: Date.now() };
+    if (isEdit) {
+      const idx = DB.employees.findIndex(x => x.id === emp.id);
+      DB.employees[idx] = { ...DB.employees[idx], ...rec };
+    } else {
+      DB.employees.push(rec);
+    }
     save(); showSuccess(); toast(isEdit ? 'Operator updated' : 'Operator added');
     renderTeam(); return true;
   });
@@ -1796,7 +2087,7 @@ function openOperatorForm (emp) {
     const del = $('#opDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this operator?')) return;
-      DB.employees = DB.employees.filter(x => x.id !== emp.id);
+      hardDelete('employees', emp.id);
       DB.recents = DB.recents.filter(id => id !== emp.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); renderTeam();
     });
@@ -1805,6 +2096,9 @@ function openOperatorForm (emp) {
 window.openNewOperator = openNewOperator;
 window.openOperator = openOperator;
 
+/* ═══════════════════════════════════════════════════════════════════
+   MASTER OP FORM
+   ═══════════════════════════════════════════════════════════════════ */
 function openNewMasterOp () { openMasterOpForm(null); }
 function openMasterOp (id) { openMasterOpForm(DB.masterOps.find(o => o.id === id)); }
 function openMasterOpForm (op) {
@@ -1821,7 +2115,7 @@ function openMasterOpForm (op) {
     const rate = Number($('#moRate').value) || 0;
     if (!name) { toast('Name is required', {success:false}); return false; }
     if (rate < 0) { toast('Rate must be positive', {success:false}); return false; }
-    const rec = { id: op ? op.id : uid('op'), name, desc: $('#moDesc').value.trim(), rate };
+    const rec = { id: op ? op.id : uid('op'), name, desc: $('#moDesc').value.trim(), rate, _updatedAt: Date.now() };
     if (isEdit) DB.masterOps[DB.masterOps.findIndex(x => x.id === op.id)] = rec;
     else DB.masterOps.push(rec);
     save(); showSuccess(); toast(isEdit ? 'Updated' : 'Added');
@@ -1831,7 +2125,7 @@ function openMasterOpForm (op) {
     const del = $('#moDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this operation?')) return;
-      DB.masterOps = DB.masterOps.filter(x => x.id !== op.id);
+      hardDelete('masterOps', op.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); renderTeam();
     });
   }, 60);
@@ -1839,6 +2133,9 @@ function openMasterOpForm (op) {
 window.openNewMasterOp = openNewMasterOp;
 window.openMasterOp = openMasterOp;
 
+/* ═══════════════════════════════════════════════════════════════════
+   BUNDLE FORM
+   ═══════════════════════════════════════════════════════════════════ */
 function openNewBundle () { openBundleForm(null); }
 function openBundle (id) { openBundleForm(DB.bundles.find(b => b.id === id)); }
 function openBundleForm (bundle) {
@@ -1880,7 +2177,7 @@ function openBundleForm (bundle) {
     }).filter(Boolean);
     if (!ops.length) { toast('Add at least one operation', {success:false}); return false; }
     const sellingPrice = acc ? (Number(($('#bPrice') || {}).value) || 0) : (Number(b.sellingPrice) || 0);
-    const rec = { id: bundle ? bundle.id : uid('b'), name, style: $('#bStyle').value.trim(), sellingPrice, ops, _draft: false, created: bundle ? bundle.created : Date.now() };
+    const rec = { id: bundle ? bundle.id : uid('b'), name, style: $('#bStyle').value.trim(), sellingPrice, ops, _draft: false, created: bundle ? bundle.created : Date.now(), _updatedAt: Date.now() };
     if (isEdit) DB.bundles[DB.bundles.findIndex(x => x.id === bundle.id)] = rec;
     else DB.bundles.push(rec);
     save(); showSuccess(); toast(isEdit ? 'Updated' : 'Created');
@@ -1915,7 +2212,7 @@ function openBundleForm (bundle) {
       const used = DB.production.filter(p => p.bundleId === bundle.id).length;
       const msg = used > 0 ? `This bundle has ${used} production entr${used === 1 ? 'y' : 'ies'}. Deleting will keep the entries but unlink them from the bundle. Continue?` : 'Delete this bundle?';
       if (!confirm(msg)) return;
-      DB.bundles = DB.bundles.filter(x => x.id !== bundle.id);
+      hardDelete('bundles', bundle.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); renderBundles();
     });
   }, 60);
@@ -1923,6 +2220,9 @@ function openBundleForm (bundle) {
 window.openNewBundle = openNewBundle;
 window.openBundle = openBundle;
 
+/* ═══════════════════════════════════════════════════════════════════
+   ENTRY FORM
+   ═══════════════════════════════════════════════════════════════════ */
 function addEntry () { openEntryForm(null, null); }
 function quickLog (empId) { openEntryForm(null, empId); }
 function openEntry (id) {
@@ -1997,7 +2297,7 @@ function openEntryForm (existing, preselectEmpId) {
     const date = $('#entDate').value || todayISO();
     const rate = Number(state.rate) || 0;
     const amount = rate * qty;
-    const rec = { id: existing ? existing.id : uid('p'), date, ts: existing ? existing.ts : Date.now(), empId: empNow.id, operatorName: empNow.name, line: empNow.line, bundleId: bundleNow.id, bundleName: bundleNow.name, operation: state.operation, rate, qty, reject: Number(state.reject) || 0, rejectReason: state.rejectReason || '', amount, notes: $('#entNotes').value.trim() };
+    const rec = { id: existing ? existing.id : uid('p'), date, ts: existing ? existing.ts : Date.now(), empId: empNow.id, operatorName: empNow.name, line: empNow.line, bundleId: bundleNow.id, bundleName: bundleNow.name, operation: state.operation, rate, qty, reject: Number(state.reject) || 0, rejectReason: state.rejectReason || '', amount, notes: $('#entNotes').value.trim(), _updatedAt: Date.now() };
     if (existing) DB.production[DB.production.findIndex(x => x.id === existing.id)] = rec;
     else { DB.production.push(rec); DB.recents = [empNow.id, ...DB.recents.filter(x => x !== empNow.id)].slice(0, 3); }
     save(); showSuccess(); toast(existing ? 'Updated' : 'Logged');
@@ -2035,13 +2335,16 @@ function openEntryForm (existing, preselectEmpId) {
     const del = $('#entDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this entry?')) return;
-      DB.production = DB.production.filter(x => x.id !== existing.id);
+      hardDelete('production', existing.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); refreshCurrentScreen();
     });
     refreshAmount();
   }, 60);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   EXPENSE FORM
+   ═══════════════════════════════════════════════════════════════════ */
 function openAddExpense () { openExpenseForm(null); }
 function openExpense (id) { openExpenseForm(DB.expenses.find(e => e.id === id)); }
 window.openAddExpense = openAddExpense;
@@ -2063,7 +2366,7 @@ function openExpenseForm (exp) {
     const amount = Number($('#expAmt').value) || 0;
     if (amount <= 0) { toast('Enter an amount', {success:false}); return false; }
     const activeCat = $('#expCat .on');
-    const rec = { id: exp ? exp.id : uid('e'), date: $('#expDate').value || todayISO(), ts: exp ? exp.ts : Date.now(), category: activeCat ? activeCat.dataset.v : EXPENSE_CATEGORIES[0], amount, note: $('#expNote').value.trim() };
+    const rec = { id: exp ? exp.id : uid('e'), date: $('#expDate').value || todayISO(), ts: exp ? exp.ts : Date.now(), category: activeCat ? activeCat.dataset.v : EXPENSE_CATEGORIES[0], amount, note: $('#expNote').value.trim(), _updatedAt: Date.now() };
     if (exp && exp._staffHoursId) rec._staffHoursId = exp._staffHoursId;
     if (exp && exp._recurringId) rec._recurringId = exp._recurringId;
     if (exp && exp.auto) rec.auto = true;
@@ -2077,12 +2380,15 @@ function openExpenseForm (exp) {
     const del = $('#expDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this expense?')) return;
-      DB.expenses = DB.expenses.filter(x => x.id !== exp.id);
+      hardDelete('expenses', exp.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); refreshCurrentScreen();
     });
   }, 60);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ADVANCE FORM
+   ═══════════════════════════════════════════════════════════════════ */
 function openAddAdvance (preselectedType, preselectedId) {
   const activeEmps = DB.employees.filter(x => x.status === 'Active');
   const staff = DB.companyStaff;
@@ -2123,7 +2429,7 @@ function openAddAdvance (preselectedType, preselectedId) {
     let personName = '';
     if (personType === 'operator') { const e = DB.employees.find(x => x.id === personId); if (!e) { toast('Person not found', {success:false}); return false; } personName = e.name; }
     else { const s = DB.companyStaff.find(x => x.id === personId); if (!s) { toast('Person not found', {success:false}); return false; } personName = s.name; }
-    const rec = { id: uid('adv'), personType, personId, personName, date: $('#advDate').value || todayISO(), amount, note: $('#advNote').value.trim(), settled: false, ts: Date.now() };
+    const rec = { id: uid('adv'), personType, personId, personName, date: $('#advDate').value || todayISO(), amount, note: $('#advNote').value.trim(), settled: false, ts: Date.now(), _updatedAt: Date.now() };
     DB.advances.push(rec);
     save(); showSuccess(); toast('Advance of ' + money(amount) + ' recorded');
     if (currentReport === 'advance') renderReportContent();
@@ -2152,6 +2458,9 @@ function openAddAdvance (preselectedType, preselectedId) {
 }
 window.openAddAdvance = openAddAdvance;
 
+/* ═══════════════════════════════════════════════════════════════════
+   COMPANY STAFF FORM (v15: past-date hours)
+   ═══════════════════════════════════════════════════════════════════ */
 function openNewCompanyStaff () { openCompanyStaffForm(null); }
 function openCompanyStaff (id) { openCompanyStaffForm(DB.companyStaff.find(s => s.id === id)); }
 window.openNewCompanyStaff = openNewCompanyStaff;
@@ -2160,9 +2469,9 @@ window.openCompanyStaff = openCompanyStaff;
 function openCompanyStaffForm (s) {
   const isEdit = !!s;
   const e = s || { id:'', name:'', role:'', salary:0, hoursPerDay:8, daysPerMonth:26 };
-  const today = todayISO();
+  let logDate = todayISO();
   const rate = staffHourlyRate(e);
-  const todayRec = s ? staffHoursToday(s.id) : null;
+  const todayRec = s ? DB.staffHours.find(h => h.staffId === s.id && h.date === logDate) : null;
   const todayHoursVal = todayRec ? todayRec.hours : '';
   const advOut = s ? advanceOutstanding('staff', s.id) : 0;
   const advBlock = s ? `
@@ -2191,9 +2500,13 @@ function openCompanyStaffForm (s) {
       <div class="hb-row"><span class="hb-l">Monthly Target</span><span class="hb-v sm" id="hbMonthly">${(Number(e.hoursPerDay)||8) * (Number(e.daysPerMonth)||26)} hrs · ${money(e.salary || 0)}</span></div>
     </div>
     ${isEdit ? `
-      <div class="field"><label>Log Hours · ${dateDisplay(today)}</label><input id="csTodayHours" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${todayHoursVal}">
-      <div class="hint">Auto-creates a Salary expense. Set 0 to remove.</div></div>
-      <div class="field"><label>Notes for today</label><input id="csTodayNote" placeholder="Optional" value="${todayRec ? escapeHtml(todayRec.note || '') : ''}"></div>
+      <div class="field">
+        <label>Log Hours · <span id="csLogDateLabel">${dateDisplay(logDate)}</span></label>
+        <input id="csLogDate" type="date" value="${logDate}" max="${todayISO()}" style="margin-bottom:8px">
+        <input id="csTodayHours" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${todayHoursVal}">
+        <div class="hint">Auto-creates a Salary expense. Set 0 to remove.</div>
+      </div>
+      <div class="field"><label>Notes for that day</label><input id="csTodayNote" placeholder="Optional" value="${todayRec ? escapeHtml(todayRec.note || '') : ''}"></div>
       ${recent.length ? `<div class="field"><label>Last 7 Days</label>${hoursListHtml}</div>` : ''}
     ` : ''}
     ${isEdit ? `<button class="btn red" id="csDelete" style="margin-top:14px">${icon('i-trash')} Delete Staff</button>` : ''}
@@ -2206,11 +2519,12 @@ function openCompanyStaffForm (s) {
     if (!name) { toast('Name is required', {success:false}); return false; }
     if (hpd <= 0 || dpm <= 0) { toast('Hours and days must be positive', {success:false}); return false; }
     if (isEdit) {
-      DB.companyStaff[DB.companyStaff.findIndex(x => x.id === s.id)] = { ...DB.companyStaff.find(x => x.id === s.id), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm };
+      const idx = DB.companyStaff.findIndex(x => x.id === s.id);
+      DB.companyStaff[idx] = { ...DB.companyStaff[idx], name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm, _updatedAt: Date.now() };
       const todayH = $('#csTodayHours') ? ($('#csTodayHours').value) : '';
-      if (todayH !== '' && todayH !== null) saveStaffHours(s.id, today, Number(todayH) || 0, ($('#csTodayNote') || {}).value || '');
+      if (todayH !== '' && todayH !== null) saveStaffHours(s.id, logDate, Number(todayH) || 0, ($('#csTodayNote') || {}).value || '');
     } else {
-      DB.companyStaff.push({ id: uid('cs'), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm });
+      DB.companyStaff.push({ id: uid('cs'), name, role: $('#csRole').value.trim(), salary, hoursPerDay: hpd, daysPerMonth: dpm, _updatedAt: Date.now() });
     }
     save(); showSuccess(); toast(isEdit ? 'Updated' : 'Added'); renderTeam(); return true;
   });
@@ -2225,6 +2539,20 @@ function openCompanyStaffForm (s) {
       const el2 = $('#hbMonthly'); if (el2) el2.textContent = `${total} hrs · ${money(sal)}`;
     };
     ['#csSalary','#csHoursPerDay','#csDaysPerMonth'].forEach(sel => { const el = $(sel); if (el) el.addEventListener('input', updateRate); });
+
+    // v15: date picker for logging hours for any past date
+        const dp = $('#csLogDate');
+    if (dp) dp.addEventListener('change', () => {
+      logDate = dp.value || todayISO();
+      const lbl = $('#csLogDateLabel');
+      if (lbl) lbl.textContent = dateDisplay(logDate);
+      const rec = DB.staffHours.find(h => h.staffId === s.id && h.date === logDate);
+      const hoursInp = $('#csTodayHours');
+      if (hoursInp) hoursInp.value = rec ? rec.hours : '';
+      const noteInp = $('#csTodayNote');
+      if (noteInp) noteInp.value = rec ? (rec.note || '') : '';
+    });
+
     $$('#staffHoursList [data-del]').forEach(btn => btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
       if (!confirm('Delete this hours entry?')) return;
@@ -2234,30 +2562,79 @@ function openCompanyStaffForm (s) {
     const del = $('#csDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this staff member?')) return;
-      DB.companyStaff = DB.companyStaff.filter(x => x.id !== s.id);
+      hardDelete('companyStaff', s.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); renderTeam();
     });
   }, 60);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   STAFF HOURS SHEET  (v15: date picker for any past date)
+   ═══════════════════════════════════════════════════════════════════ */
 function openStaffHoursSheet () {
   if (!DB.companyStaff.length) { toast('No company staff yet', {success:false}); nav('team'); return; }
-  const today = todayISO();
-  const html = DB.companyStaff.map(s => {
-    const rate = staffHourlyRate(s);
-    const rec = staffHoursToday(s.id);
-    return `<div class="field" data-sid="${s.id}"><label>${escapeHtml(s.name)} · ${money2(rate)}/hr</label><input class="sh-hours" data-sid="${s.id}" type="number" inputmode="decimal" min="0" max="24" step="0.5" placeholder="0" value="${rec ? rec.hours : ''}"></div>`;
-  }).join('');
-  openSheet('Log Staff Hours · ' + dateDisplay(today), html, () => {
+  let logDate = todayISO();
+
+  function buildBody () {
+    return `
+      <div class="field">
+        <label>Log Date</label>
+        <input id="shDate" type="date" value="${logDate}" max="${todayISO()}">
+        <div class="hint">Pick any past date to log or edit hours.</div>
+      </div>
+      ${DB.companyStaff.map(s => {
+        const rate = staffHourlyRate(s);
+        const rec = DB.staffHours.find(h => h.staffId === s.id && h.date === logDate);
+        return `<div class="field" data-sid="${s.id}">
+          <label>${escapeHtml(s.name)} · ${money2(rate)}/hr</label>
+          <input class="sh-hours" data-sid="${s.id}" type="number"
+                 inputmode="decimal" min="0" max="24" step="0.5"
+                 placeholder="0" value="${rec ? rec.hours : ''}">
+        </div>`;
+      }).join('')}
+    `;
+  }
+
+  openSheet('Log Staff Hours', buildBody(), () => {
     let count = 0;
-    $$('.sh-hours').forEach(inp => { const v = inp.value.trim(); if (v === '') return; saveStaffHours(inp.dataset.sid, today, Number(v) || 0, ''); count++; });
-    if (count > 0) { save(); showSuccess(); toast(count + ' saved'); }
+    $$('.sh-hours').forEach(inp => {
+      const v = inp.value.trim();
+      const sid = inp.dataset.sid;
+      if (v === '') {
+        // clear any existing entry for that day
+        const ex = DB.staffHours.find(h => h.staffId === sid && h.date === logDate);
+        if (ex) { saveStaffHours(sid, logDate, 0, ''); count++; }
+        return;
+      }
+      saveStaffHours(sid, logDate, Number(v) || 0, '');
+      count++;
+    });
+    if (count > 0) { save(); showSuccess(); toast(count + ' saved for ' + dateDisplay(logDate)); }
     else toast('Nothing to save');
-    refreshCurrentScreen(); return true;
+    refreshCurrentScreen();
+    return true;
   });
+
+  setTimeout(() => {
+    const dp = $('#shDate');
+    if (!dp) return;
+    dp.addEventListener('change', () => {
+      logDate = dp.value || todayISO();
+      // preserve the sheet body and re-render just the inputs section
+      const rebuilt = buildBody();
+      sheetBody.innerHTML = rebuilt;
+      const dp2 = $('#shDate');
+      if (dp2) {
+        dp2.addEventListener('change', arguments.callee);
+      }
+    });
+  }, 60);
 }
 window.openStaffHoursSheet = openStaffHoursSheet;
 
+/* ═══════════════════════════════════════════════════════════════════
+   RECURRING SHEET
+   ═══════════════════════════════════════════════════════════════════ */
 function openRecurringSheet () {
   if (!DB.recurring.length) { openRecurringForm(null); return; }
   const html = DB.recurring.map(r => `
@@ -2309,13 +2686,13 @@ function openRecurringForm (r) {
     const end = $('#recEnd').value || '';
     if (end && end < start) { toast('End date must be after start', {success:false}); return false; }
     const freqBtn = $('#recFreq .on'), activeBtn = $('#recActive .on');
-    const rec = { id: r ? r.id : uid('rec'), category: $('#recCat').value, amount, frequency: freqBtn ? freqBtn.dataset.v : 'daily', startDate: start, endDate: end, note: $('#recNote').value.trim(), active: activeBtn ? activeBtn.dataset.v === 'on' : true };
+    const rec = { id: r ? r.id : uid('rec'), category: $('#recCat').value, amount, frequency: freqBtn ? freqBtn.dataset.v : 'daily', startDate: start, endDate: end, note: $('#recNote').value.trim(), active: activeBtn ? activeBtn.dataset.v === 'on' : true, _updatedAt: Date.now() };
     if (isEdit) DB.recurring[DB.recurring.findIndex(x => x.id === r.id)] = rec;
     else DB.recurring.push(rec);
     save();
     const created = processRecurring();
     showSuccess();
-    toast(isEdit ? 'Updated' : 'Added' + (created ? ' · ' + created + ' auto-added' : ''));
+    toast(isEdit ? 'Updated' : ('Added' + (created ? ' · ' + created + ' auto-added' : '')));
     refreshCurrentScreen(); return true;
   });
   setTimeout(() => {
@@ -2323,12 +2700,15 @@ function openRecurringForm (r) {
     const del = $('#recDelete');
     if (del) del.addEventListener('click', () => {
       if (!confirm('Delete this template?')) return;
-      DB.recurring = DB.recurring.filter(x => x.id !== r.id);
+      hardDelete('recurring', r.id);
       save(); showSuccess(); toast('Deleted'); closeSheet(); refreshCurrentScreen();
     });
   }, 60);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   FILTER BAR / MONTH NAV
+   ═══════════════════════════════════════════════════════════════════ */
 const monthlyState = { month: todayISO().slice(0,7), week: todayISO() };
 
 function renderFilterBar () {
@@ -2350,6 +2730,7 @@ function renderFilterBar () {
   else row.classList.remove('on');
   attachRipple();
 }
+
 function renderMonthNav () {
   const wrap = $('#monthNavWrap'); if (!wrap) return;
   if (currentReport === 'monthly') {
@@ -2374,6 +2755,7 @@ function renderMonthNav () {
     }, 30);
   } else wrap.innerHTML = '';
 }
+
 function renderCustomDateRow () {
   const row = $('#customDateRow'), f = $('#filterFrom'), t = $('#filterTo');
   if (filterState.dateType !== 'custom') { row.classList.remove('on'); return; }
@@ -2382,6 +2764,7 @@ function renderCustomDateRow () {
   f.onchange = () => { filterState.from = f.value || todayISO(); renderActiveFilters(); renderReportContent(); };
   t.onchange = () => { filterState.to = t.value || todayISO(); renderActiveFilters(); renderReportContent(); };
 }
+
 function renderActiveFilters () {
   const strip = $('#activeFilterStrip'); if (!strip) return;
   if (currentReport === 'recurring' || currentReport === 'monthly' || currentReport === 'weekly') { strip.innerHTML = ''; return; }
@@ -2389,7 +2772,11 @@ function renderActiveFilters () {
   strip.innerHTML = `<span>📅 <b>${from === to ? dateDisplay(from) : dateDisplay(from) + ' → ' + dateDisplay(to)}</b></span>`;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   REPORT ROUTER
+   ═══════════════════════════════════════════════════════════════════ */
 let currentReport = null;
+
 function openReport (id) {
   if (id === 'pnl' && !isAccount()) { toast('Account access only', {success:false}); return; }
   currentReport = id;
@@ -2416,6 +2803,7 @@ function renderReportContent () {
   const id = currentReport;
   const content = $('#reportContent');
   if (!id) { content.innerHTML = ''; return; }
+
   if (id === 'recurring') {
     content.innerHTML = buildRecurringReport();
     attachRipple();
@@ -2436,16 +2824,19 @@ function renderReportContent () {
   const exps = applyExpenseFilters(DB.expenses);
   const { from, to } = resolveDateRange();
   const hours = DB.staffHours.filter(h => h.date >= from && h.date <= to);
-  if (id === 'salary') content.innerHTML = buildSalaryReport(rows, from, to);
+  if (id === 'salary')      content.innerHTML = buildSalaryReport(rows, from, to);
   else if (id === 'staffhours') content.innerHTML = buildStaffHoursReport(hours, from, to);
-  else if (id === 'expense') content.innerHTML = buildExpenseReport(exps);
-  else if (id === 'daily') content.innerHTML = buildDailyReport(rows);
-  else if (id === 'operator') content.innerHTML = buildOperatorReport(rows);
-  else if (id === 'bundle') content.innerHTML = buildBundleReport(rows);
-  else if (id === 'operation') content.innerHTML = buildOperationReport(rows);
+  else if (id === 'expense')    content.innerHTML = buildExpenseReport(exps);
+  else if (id === 'daily')      content.innerHTML = buildDailyReport(rows);
+  else if (id === 'operator')   content.innerHTML = buildOperatorReport(rows);
+  else if (id === 'bundle')     content.innerHTML = buildBundleReport(rows);
+  else if (id === 'operation')  content.innerHTML = buildOperationReport(rows);
   attachRipple();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   REPORT BUILDERS
+   ═══════════════════════════════════════════════════════════════════ */
 function buildAdvanceLedger () {
   const { from, to } = resolveDateRange();
   const periodAdvances = DB.advances.filter(a => a.date >= from && a.date <= to);
@@ -2476,10 +2867,13 @@ function buildAdvanceLedger () {
     ${list.length ? list.map(p => renderAdvancePersonCard(p, from, to)).join('') : emptyState('i-hand', 'No advances yet', 'Tap "Record Advance Payment" to start the ledger.')}
   `;
 }
+
 function renderAdvancePersonCard (p, from, to) {
   const periodAmt = p.entries.filter(a => a.date >= from && a.date <= to).reduce((s, a) => s + a.amount, 0);
   const typeLabel = p.personType === 'operator' ? 'Operator' : 'Company Staff';
-  const badge = p.outstanding > 0 ? `<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">OUTSTANDING</span>` : `<span style="background:var(--emerald-lt);color:var(--emerald-dk);padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">CLEARED</span>`;
+  const badge = p.outstanding > 0
+    ? `<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">OUTSTANDING</span>`
+    : `<span style="background:var(--emerald-lt);color:var(--emerald-dk);padding:2px 8px;border-radius:100px;font-size:10px;font-weight:800">CLEARED</span>`;
   const sortedEntries = [...p.entries].sort((a,b) => b.date.localeCompare(a.date));
   return `
     <div class="salary-section">
@@ -2717,9 +3111,8 @@ function buildStaffHoursReport (hours, from, to) {
       ${totalAdvOutstanding > 0 ? `<div class="rh-row"><div class="rh-stat"><div class="rl">Outstanding Advances</div><div class="rv">${money(totalAdvOutstanding)}</div></div></div>` : ''}
     </div>
     ${list.map(emp => {
-      const staffId = emp.id;
-      const advOut = staffId ? advanceOutstanding('staff', staffId) : 0;
-      const advInPeriod = staffId ? advanceTotalInPeriod('staff', staffId, from, to) : 0;
+      const advOut = emp.id ? advanceOutstanding('staff', emp.id) : 0;
+      const advInPeriod = emp.id ? advanceTotalInPeriod('staff', emp.id, from, to) : 0;
       const netPayable = emp.amount - advInPeriod;
       return `
         <div class="salary-section">
@@ -2867,15 +3260,48 @@ function emptyState (iconId, title, text) {
   return `<div class="empty"><div class="eic">${icon(iconId)}</div><h4>${escapeHtml(title)}</h4><p>${escapeHtml(text)}</p><p style="font-size:12px;color:var(--text-3);margin-top:6px">Try widening the date range with the chips above.</p></div>`;
 }
 
-function shareReport () { toast('Use PDF button or screenshot'); }
+/* ═══════════════════════════════════════════════════════════════════
+   SHARE REPORT  (v15: real Web Share + clipboard fallback)
+   ═══════════════════════════════════════════════════════════════════ */
+async function shareReport () {
+  if (!currentReport) { toast('Open a report first', { success:false }); return; }
+  const title = ({ monthly:'Monthly Grid', weekly:'Weekly Grid', salary:'Salary Sheet',
+    staffhours:'Staff Hours', expense:'Expense Report', recurring:'Recurring Expenses',
+    daily:'Daily Production', operator:'Operator Report', bundle:'Bundle Report',
+    operation:'Operation Report', pnl:'Profit & Loss', advance:'Advance Ledger' })[currentReport] || 'Report';
+  const { from, to } = resolveDateRange();
+  const range = from === to ? dateDisplay(from) : `${dateDisplay(from)} → ${dateDisplay(to)}`;
+  const body = $('#reportContent') ? $('#reportContent').innerText : '';
+  const text = `Aadhithran Enterprises — ${title}\n${range}\n\n${body}`;
+  const payload = { title: `${title} — Aadhithran`, text };
 
+  try {
+    if (navigator.share) {
+      await navigator.share(payload);
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Report copied to clipboard');
+  } catch (e) {
+    toast('Sharing not supported on this device', { success:false });
+  }
+}
+window.shareReport = shareReport;
+
+/* ═══════════════════════════════════════════════════════════════════
+   SETTINGS / PIN
+   ═══════════════════════════════════════════════════════════════════ */
 function openSettingsSheet () {
   const days = !META.lastBackup ? Infinity : Math.floor((Date.now() - META.lastBackup) / 86400000);
   const backupLabel = days === Infinity ? 'Never' : days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago';
   const statusLabel = { idle:'Ready', pulling:'Pulling…', pushing:'Pushing…', synced:'Synced', error:'Error: ' + (Sync.lastError || 'unknown') }[Sync.status] || Sync.status;
-  
-  const getRealtimeHtml = () => Sync._unsubs.length 
-    ? '<span style="color:var(--emerald)">●</span> Connected' 
+
+  const getRealtimeHtml = () => Sync._unsubs.length
+    ? '<span style="color:var(--emerald)">●</span> Connected'
     : '<span style="color:var(--text-4)">●</span> Not connected';
 
   const pinSection = isAdmin()
@@ -2907,10 +3333,11 @@ function openSettingsSheet () {
     </div>
     ${pinSection}
     <div class="field"><label>Danger zone</label><button class="btn red" id="doClearBtn">${icon('i-trash')} Clear all data</button></div>
+    <div class="field" style="margin-top:18px"><button class="btn gray" id="logoutBtn" style="width:100%">${icon('i-logout')} Sign out</button></div>
   `;
-  
+
   openSheet('Settings', html, null);
-  
+
   const intv = setInterval(() => {
     const el = $('#realtimeLabel');
     if (!el || !sheet.classList.contains('on')) { clearInterval(intv); return; }
@@ -2923,6 +3350,7 @@ function openSettingsSheet () {
     $('#doBackupBtn').addEventListener('click', backupNow);
     $('#doRestoreBtn').addEventListener('click', pickRestoreFile);
     $('#doClearBtn').addEventListener('click', confirmClearAll);
+    $('#logoutBtn').addEventListener('click', () => { closeSheet(); setTimeout(logout, 200); });
     const ap = $('#changeAdminPin'); if (ap) ap.addEventListener('click', () => openPinChangeSheet('admin'));
     const cp = $('#changeAccountPin'); if (cp) cp.addEventListener('click', () => openPinChangeSheet('account'));
   }, 60);
@@ -2943,14 +3371,18 @@ function openPinChangeSheet (role) {
     const cur = ($('#pinCurrent').value || '').trim();
     const nw  = ($('#pinNew').value || '').trim();
     const cf  = ($('#pinConfirm').value || '').trim();
-    if (cur !== current)   { toast('Current PIN is wrong', {success:false}); return false; }
-    if (!/^\d{4}$/.test(nw)) { toast('New PIN must be 4 digits', {success:false}); return false; }
-    if (nw !== cf)         { toast('PINs do not match', {success:false}); return false; }
-    if (role === 'admin') DB.admin.pin = nw; else DB.account.pin = nw;
+    if (cur !== current)      { toast('Current PIN is wrong', {success:false}); return false; }
+    if (!/^\d{4}$/.test(nw))  { toast('New PIN must be 4 digits', {success:false}); return false; }
+    if (nw !== cf)            { toast('PINs do not match', {success:false}); return false; }
+    if (role === 'admin') { DB.admin.pin = nw;   DB.admin._updatedAt = Date.now(); }
+    else                  { DB.account.pin = nw; DB.account._updatedAt = Date.now(); }
     save(); toast('PIN updated'); return true;
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   BOTTOM INIT
+   ═══════════════════════════════════════════════════════════════════ */
 setLoginRole('admin');
 updatePinSlots();
 
@@ -2966,15 +3398,18 @@ $('#teamAddBtn').addEventListener('click', () => {
   else openNewCompanyStaff();
 });
 $('#shareBtn').addEventListener('click', shareReport);
-$('#exportPdfBtn').addEventListener('click', () => window.print());
+$('#exportPdfBtn').addEventListener('click', () => {
+  try {
+    if (sheet.classList.contains('on')) closeSheet();
+    setTimeout(() => window.print(), 300);
+  } catch (e) { toast('Print failed: ' + e.message, { success:false }); }
+});
 
 attachRipple();
 updateSyncIndicator();
 
 /* Boot: connect to Firestore, pull latest shards, start live listeners. */
-Sync.bootstrap().catch(err => {
-  console.warn('Sync bootstrap failed:', err);
-});
+Sync.bootstrap().catch(err => { console.warn('Sync bootstrap failed:', err); });
 
 /* Recurring expenses are checked every minute while the app is open. */
 setInterval(() => {
@@ -2986,7 +3421,7 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-/* Coming back to the app: safety pull once a minute (onSnapshot handles live changes). */
+/* Coming back to the app: catch-up recurring + safety pull once a minute. */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   const created = processRecurring();
