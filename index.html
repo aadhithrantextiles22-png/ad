@@ -1196,34 +1196,75 @@ const Sync = {
 
   setStatus (s) { this.status = s; updateSyncIndicator(); },
 
-  async _ensureFirebase () {
-    if (this._fbPromise) return this._fbPromise;
-    this._fbPromise = (async () => {
-      const [
-        { initializeApp, getApps, getApp },
-        { getAuth, signInAnonymously, onAuthStateChanged },
-        { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, runTransaction },
-      ] = await Promise.all([
-        import(`${FIREBASE_CDN}/firebase-app.js`),
-        import(`${FIREBASE_CDN}/firebase-auth.js`),
-        import(`${FIREBASE_CDN}/firebase-firestore.js`),
-      ]);
-      const app  = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
-      const auth = getAuth(app);
-      const fdb  = getFirestore(app);
-      if (!auth.currentUser) {
-        await new Promise((resolve, reject) => {
-          const unsub = onAuthStateChanged(auth,
-            (u) => { unsub(); u ? resolve(u) : signInAnonymously(auth).then(resolve).catch(reject); },
-            (err) => { unsub(); reject(err); });
-        });
-      }
-      return { auth, fdb, doc, getDoc, setDoc, onSnapshot, serverTimestamp, runTransaction };
-    })().catch(err => { this._fbPromise = null; throw err; });
-    return this._fbPromise;
-  },
+   async _ensureFirebase () {
+  if (this._fbPromise) return this._fbPromise;
+  this._fbPromise = (async () => {
+    const [
+      { initializeApp, getApps, getApp },
+      { getAuth, signInAnonymously, onAuthStateChanged },
+      { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, runTransaction },
+    ] = await Promise.all([
+      import(`${FIREBASE_CDN}/firebase-app.js`),
+      import(`${FIREBASE_CDN}/firebase-auth.js`),
+      import(`${FIREBASE_CDN}/firebase-firestore.js`),
+    ]);
 
-  _docFor (fb, name) { return fb.doc(fb.fdb, 'shards', name); },
+    const app  = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
+    const auth = getAuth(app);
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ HARDENED Firestore initialisation
+    // Ensures we ALWAYS pass a Firestore INSTANCE, never the factory
+    // function `getFirestore` itself.
+    // ═══════════════════════════════════════════════════════════════
+    let fdb = getFirestore(app);
+    if (typeof fdb === 'function') {
+      // Some SDK/cache combos return the factory — force a call
+      console.warn('[Firebase] getFirestore(app) returned a function — retrying with getFirestore()');
+      fdb = getFirestore();
+    }
+    if (typeof fdb === 'function' || !fdb || typeof fdb !== 'object') {
+      throw new Error(
+        '[Firebase] getFirestore() did not return a Firestore instance. ' +
+        'typeof fdb = ' + typeof fdb + '. Check that the SDK URL loads correctly and your browser is not blocking gstatic.com.'
+      );
+    }
+
+    if (!auth.currentUser) {
+      await new Promise((resolve, reject) => {
+        const unsub = onAuthStateChanged(auth,
+          (u) => { unsub(); u ? resolve(u) : signInAnonymously(auth).then(resolve).catch(reject); },
+          (err) => { unsub(); reject(err); });
+      });
+    }
+
+    // Verify the SDK actually accepted `fdb` before returning it
+    try { doc(fdb, '_probe_', '_probe_'); }
+    catch (err) {
+      throw new Error('[Firebase] Firestore SDK rejected the instance: ' + err.message +
+        ' — fdb is typeof ' + typeof fdb + ', ctor=' + (fdb && fdb.constructor && fdb.constructor.name));
+    }
+
+    // One-time diagnostic so you can see the truth in DevTools
+    console.info('[Firebase] ready · getFirestore:', typeof getFirestore,
+      '· fdb:', typeof fdb,
+      '· fdb.constructor:', fdb && fdb.constructor && fdb.constructor.name);
+
+    return {
+      auth, fdb, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
+      runTransaction: (cb, opts) => runTransaction(fdb, cb, opts),
+    };
+  })().catch(err => { this._fbPromise = null; throw err; });
+  return this._fbPromise;
+},
+
+  _docFor (fb, name) {
+    if (typeof fb.fdb === 'function') {
+      // Recover: someone passed getFirestore instead of getFirestore(app)
+      fb.fdb = fb.fdb();
+    }
+    return fb.doc(fb.fdb, 'shards', name);
+  },
 
   async _readShard (fb, name) {
     const snap = await fb.getDoc(this._docFor(fb, name));
